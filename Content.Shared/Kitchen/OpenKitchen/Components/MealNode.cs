@@ -121,7 +121,7 @@ public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<Mea
     /// A list of items which have been added to this meal.
     /// Used to determine the actual type of the meal.
     /// </summary>
-    public List<MealNode> Ingredients { get; set; }
+    public List<MealNode> Ingredients { get; set; } = [];
 
     public MealNode Clone()
     {

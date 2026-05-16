@@ -166,7 +166,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
 
         var energy = reaction.ConserveEnergy ? solution.GetThermalEnergy(_prototypeManager) : 0;
         //store the deviations inside the mixture (thus we can later perfectly reconstruct the underlying solution)
-        var reagentData = new FuzzyMixtureReagentData();
+    //    var reagentData = new FuzzyMixtureReagentData();
         //Remove reactants
         var reactants = reaction.Reactants.ToArray();
         for (var i = 0; i < reaction.Reactants.Count; i++)
@@ -175,7 +175,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             if (!reactant.Value.Catalyst)
             {
                 var amountToRemove = unitReactions * (reactant.Value.Amount + deviations[i]);
-                reagentData.Mixture.Add(reactant.Key, deviations[i]);
+          //      reagentData.Mixture.Add(reactant.Key, deviations[i]);
                 solution.RemoveReagent(reactant.Key, amountToRemove, ignoreReagentData: true);
             }
         }
@@ -192,7 +192,8 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         if (reaction.Product != null)
         {
             //compile
-            var id = new ReagentId(reaction.Product, [reagentData]);
+      //      var id = new ReagentId(reaction.Product, [reagentData]);
+            var id = new ReagentId(reaction.Product, null);
             //Create product
             solution.AddReagent(id, reaction.ProductAmount * unitReactions);
             if (reaction.ConserveEnergy)
@@ -244,6 +245,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         foreach (var reaction in reactions)
         {
             var actualSolution = soln.Comp.Solution;
+
             //resolve any existing amount of the reaction product to its base components (in an attempt to grow the fuzzy mixture, either with other raw material or even other fuzzy mixtures of the same solution)
             if (reaction.Product != null)
             {

@@ -2,6 +2,7 @@ using System.Linq;
 using Content.Shared.Chemistry.Reagent;
 using Content.Shared.FixedPoint;
 using Robust.Shared.Prototypes;
+using Robust.Shared.Serialization;
 
 namespace Content.Shared.Kitchen.OpenKitchen.Components;
 
@@ -9,9 +10,11 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 /// Used to store fuzzy ratios of the ingredients used to make this cooking reagent.
 /// Like how much egg, flour and milk is in pancake batter.
 /// </summary>
+[ImplicitDataDefinitionForInheritors, Serializable, NetSerializable]
 public sealed partial class FuzzyMixtureReagentData : ReagentData
 {
-    public Dictionary<ProtoId<ReagentPrototype>, FixedPoint2> Mixture { get; init; } = [];
+    [DataField]
+    public Dictionary<ProtoId<ReagentPrototype>, FixedPoint2> Mixture = [];
 
     public override bool Equals(ReagentData? other)
     {
