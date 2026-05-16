@@ -10,6 +10,7 @@ using Content.Shared.Containers;
 using Content.Shared.Examine;
 using Content.Shared.FixedPoint;
 using Content.Shared.Hands.EntitySystems;
+using Content.Shared.Kitchen.OpenKitchen.EntitySystems;
 using Content.Shared.Localizations;
 using Content.Shared.Nutrition.EntitySystems;
 using Content.Shared.Verbs;
@@ -70,6 +71,7 @@ public abstract partial class SharedSolutionContainerSystem : EntitySystem
     [Dependency] protected INetManager Net = default!;
     [Dependency] protected IPrototypeManager PrototypeManager = default!;
     [Dependency] protected ChemicalReactionSystem ChemicalReactionSystem = default!;
+    [Dependency] protected FuzzyReactionSystem FuzzyReactionSystem = default!;
     [Dependency] protected ExamineSystemShared ExamineSystem = default!;
     [Dependency] protected OpenableSystem Openable = default!;
     [Dependency] protected SharedAppearanceSystem AppearanceSystem = default!;
@@ -384,7 +386,10 @@ public abstract partial class SharedSolutionContainerSystem : EntitySystem
     {
         // Process reactions
         if (needsReactionsProcessing && solution.Comp.Solution.CanReact)
+        {
             ChemicalReactionSystem.FullyReactSolution(solution, mixerComponent);
+            FuzzyReactionSystem.FullyReactSolution(solution,mixerComponent);
+        }
 
         var overflow = solution.Comp.Solution.Volume - solution.Comp.Solution.MaxVolume;
         if (overflow > FixedPoint2.Zero)

@@ -17,28 +17,12 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<MealNode>
 {
     /// <summary>
-    /// For consistency within the system
-    /// and to reduce headache in recipe prototypes,
-    /// Cookedness is mapped to certain fixed degrees.
-    /// </summary>
-    public enum CookDegree
-    {
-        Frozen,
-        Raw,
-        Undercooked,
-        Medium,
-        WellDone,
-        Crispy,
-        Burnt,
-    }
-
-    /// <summary>
     /// The starting type of a meal node.
     /// This is something like: RawPancake, EmptyBowl, WaterInAPot.
     /// Is used during evaluation to determine the real type.
     /// </summary>
     [DataField]
-    public ProtoId<MealTypePrototype> MealType { get; set; } = default!;
+    public ProtoId<MealTypePrototype> MealType { get; set; }
 
     /// <summary>
     /// The meal type after evaluation.
@@ -85,29 +69,6 @@ public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<Mea
     [DataField]
     public FixedPoint2 Volume { get; set; }
 
-    /// <summary>
-    /// A unified mapping of Cookedness to the description of the meals node degree of cookedness.
-    /// Is used to determine actual meal.
-    /// </summary>
-    public CookDegree DegreeOfCoockedness
-    {
-        get
-        {
-            if (Cookedness < 0)
-                return CookDegree.Frozen;
-            if (Cookedness < 25)
-                return CookDegree.Raw;
-            if (Cookedness < 50)
-                return CookDegree.Undercooked;
-            if (Cookedness < 75)
-                return CookDegree.Medium;
-            if (Cookedness < 100)
-                return CookDegree.WellDone;
-            if (Cookedness < 125)
-                return CookDegree.Crispy;
-            return CookDegree.Burnt;
-        }
-    }
 
     /// <summary>
     /// This is the optional solution on which this meal node was based on.
@@ -125,15 +86,15 @@ public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<Mea
 
     public MealNode Clone()
     {
-        return new MealNode()
+        return new MealNode
         {
-            Cookedness =  Cookedness,
-            ActualDescription =  ActualDescription,
+            Cookedness = Cookedness,
+            ActualDescription = ActualDescription,
             ActualName = ActualName,
-            ActualMealType =  ActualMealType,
-            ActualTaste =  ActualTaste,
-            HullSolution =  HullSolution?.Clone(),
-            Ingredients = Ingredients.Select(e=>e.Clone()).ToList(),
+            ActualMealType = ActualMealType,
+            ActualTaste = ActualTaste,
+            HullSolution = HullSolution?.Clone(),
+            Ingredients = Ingredients.Select(e => e.Clone()).ToList(),
             MealType = MealType,
         };
     }

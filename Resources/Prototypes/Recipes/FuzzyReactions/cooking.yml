@@ -1,0 +1,21 @@
+- type: fuzzyReaction
+  id: MixingPancakeBatter
+  impact: Low
+  quantized: false
+  conserveEnergy: false
+  reactants:
+    Flour:
+      amount: 5
+      minAmount: 3.5
+      maxAmount: 5.5
+    Milk:
+      amount: 5
+      minAmount: 4.5
+      maxAmount: 5.5
+    Egg:
+      amount: 6
+      minAmount: 5
+      maxAmount: 7.5
+  product: PancakeBatter
+  productAmount: 16
+

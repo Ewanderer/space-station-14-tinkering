@@ -13,23 +13,22 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 [RegisterComponent] [NetworkedComponent]
 public sealed partial class ProtoMealComponent : Component
 {
+    public enum HullSourceOption
+    {
+        NoHull,
+        ProtoMealComponent,
+        ExtractableComponent,
+        SolutionComponent,
+    }
+
+    public HullSourceOption HullSource;
+
     [DataField]
-    public ProtoId<MealTypePrototype> Prototype { get; set; } = default!;
+    public ProtoId<MealTypePrototype> Prototype { get; set; }
 
     [DataField]
     public FixedPoint2 Capacity { get; set; }
 
     [DataField]
     public Solution? HullSolution { get; set; }
-
-    public HullSourceOption HullSource;
-
-    public enum HullSourceOption
-    {
-        NoHull,
-        ProtoMealComponent,
-        ExtractableComponent,
-        SolutionComponent
-    }
-
 }

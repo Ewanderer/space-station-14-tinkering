@@ -4,7 +4,6 @@ using Content.Shared.Chemistry.Reagent;
 using Content.Shared.FixedPoint;
 using Content.Shared.Kitchen.Components;
 using Content.Shared.Kitchen.OpenKitchen.Components;
-using Content.Shared.Kitchen.OpenKitchen.Prototypes;
 using Robust.Shared.Prototypes;
 
 namespace Content.Shared.Kitchen.OpenKitchen.EntitySystems;
@@ -14,7 +13,45 @@ namespace Content.Shared.Kitchen.OpenKitchen.EntitySystems;
 /// </summary>
 public sealed partial class SharedMealSystem : EntitySystem
 {
+    /// <summary>
+    /// For consistency within the system
+    /// and to reduce headache in recipe prototypes,
+    /// Cookedness is mapped to certain fixed degrees.
+    /// </summary>
+    public enum CookDegree
+    {
+        Frozen,
+        Raw,
+        Undercooked,
+        Medium,
+        WellDone,
+        Crispy,
+        Burnt,
+    }
+
+
     [Dependency] private IPrototypeManager _proto = default!;
+
+    /// <summary>
+    /// A unified mapping of Cookedness to the description of the meals node degree of cookedness.
+    /// Is used to determine actual meal.
+    /// </summary>
+    public static CookDegree GetDegreeOfCoockedness(MealNode node)
+    {
+        if (node.Cookedness < 0)
+            return CookDegree.Frozen;
+        if (node.Cookedness < 25)
+            return CookDegree.Raw;
+        if (node.Cookedness < 50)
+            return CookDegree.Undercooked;
+        if (node.Cookedness < 75)
+            return CookDegree.Medium;
+        if (node.Cookedness < 100)
+            return CookDegree.WellDone;
+        if (node.Cookedness < 125)
+            return CookDegree.Crispy;
+        return CookDegree.Burnt;
+    }
 
 
     /// <summary>
@@ -73,7 +110,7 @@ public sealed partial class SharedMealSystem : EntitySystem
         // check if entity has proto meal component
         if (TryComp(entity, out ProtoMealComponent? protoMeal))
         {
-            var protoMealContainer = MakeMealFromProtoMeal(new(entity, protoMeal));
+            var protoMealContainer = MakeMealFromProtoMeal(new Entity<ProtoMealComponent>(entity, protoMeal));
             //check capacity vs meal
             if (protoMealContainer.Volume > remainingSpace)
                 return false;
@@ -87,13 +124,9 @@ public sealed partial class SharedMealSystem : EntitySystem
         // check if juiceable
         if (TryComp(entity, out ExtractableComponent? extractableComponent) &&
             (extractableComponent.JuiceSolution?.Contents.Any() ?? false))
-        {
             addedSolution = extractableComponent.JuiceSolution;
-        }
         else if (TryComp(entity, out SolutionComponent? solutionComponent)) //use raw solution
-        {
             addedSolution = solutionComponent.Solution;
-        }
 
         //if no match or too big, cannot add.
         if (addedSolution == null || addedSolution.Volume > remainingSpace)
@@ -148,7 +181,7 @@ public sealed partial class SharedMealSystem : EntitySystem
                 throw new ArgumentOutOfRangeException();
         }
 
-        return new MealNode()
+        return new MealNode
         {
             Capacity = protoMeal.Comp.Capacity,
             MealType = _proto.Index(protoMeal.Comp.Prototype),

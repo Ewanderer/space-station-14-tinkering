@@ -1,0 +1,20 @@
+# List of batters for baking, basically liquid variants of a dough.
+
+- type: reagent
+  id: PancakeBatter
+  name: reagent-name-pancake-batter
+  group: Foods
+  desc: reagent-desc-pancake-batter
+  physicalDesc: reagent-physical-desc-powdery
+  flavor: nutriment
+  color: '#ffffdf'
+  recognizable: false
+  metabolisms:
+    Digestion:
+      metabolites:
+        Sugar: 0.4
+        Nutriment: 0.2
+        UncookedAnimalProteins: 1.1
+      effects:
+      - !type:SatiateThirst
+        factor: 3.8 #its flour with milk

@@ -10,15 +10,11 @@ namespace Content.Shared.Kitchen.OpenKitchen.Prototypes;
 [Prototype]
 public sealed partial class MealTypePrototype : IPrototype
 {
-
     /// <summary>
     /// Effects to be triggered when the meal is eaten.
     /// </summary>
     [DataField("effects")]
     public EntityEffect[] ConsumptionEffects = [];
-
-    [DataField("name")]
-    public string Name { get; private set; } = string.Empty;
 
     /// <summary>
     /// How is this meal related to other meals?
@@ -28,6 +24,8 @@ public sealed partial class MealTypePrototype : IPrototype
     [DataField("parents")]
     public ProtoId<MealTypePrototype>[]? ParentMealTypes;
 
+    [DataField("name")]
+    public string Name { get; private set; } = string.Empty;
 
 
     [ViewVariables]

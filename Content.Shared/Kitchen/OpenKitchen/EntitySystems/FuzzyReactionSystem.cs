@@ -19,21 +19,26 @@ namespace Content.Shared.Kitchen.OpenKitchen.EntitySystems;
 public sealed partial class FuzzyReactionSystem : EntitySystem
 {
     /// <summary>
+    /// The maximum number of reactions that may occur when a solution is changed.
+    /// </summary>
+    private const int MaxReactionIterations = 20;
+
+    /// <summary>
     /// Foam reaction protoId.
     /// </summary>
     public static readonly ProtoId<ReactionPrototype> FoamReaction = "Foam";
 
-    /// <summary>
-    ///     The maximum number of reactions that may occur when a solution is changed.
-    /// </summary>
-    private const int MaxReactionIterations = 20;
+    [Dependency] private ISharedAdminLogManager _adminLogger = default!;
+    [Dependency] private SharedAudioSystem _audio = default!;
+    [Dependency] private SharedEntityEffectsSystem _entityEffects = default!;
 
     [Dependency] private INetManager _netMan = default!;
     [Dependency] private IPrototypeManager _prototypeManager = default!;
-    [Dependency] private ISharedAdminLogManager _adminLogger = default!;
-    [Dependency] private SharedAudioSystem _audio = default!;
-    [Dependency] private SharedTransformSystem _transformSystem = default!;
-    [Dependency] private SharedEntityEffectsSystem _entityEffects = default!;
+
+    /// <summary>
+    /// A cache of all reactions indexed by one of their required reactants.
+    /// </summary>
+    private FrozenDictionary<string, List<FuzzyReactionPrototype>> _reactions = default!;
 
     /// <summary>
     /// A cache of all reactions indexed by at most ONE of their required reactants.
@@ -41,10 +46,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
     /// </summary>
     private FrozenDictionary<string, List<FuzzyReactionPrototype>> _reactionsSingle = default!;
 
-    /// <summary>
-    ///     A cache of all reactions indexed by one of their required reactants.
-    /// </summary>
-    private FrozenDictionary<string, List<FuzzyReactionPrototype>> _reactions = default!;
+    [Dependency] private SharedTransformSystem _transformSystem = default!;
 
     public override void Initialize()
     {
@@ -55,7 +57,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
     }
 
     /// <summary>
-    ///     Handles building the reaction cache.
+    /// Handles building the reaction cache.
     /// </summary>
     private void InitializeReactionCache()
     {
@@ -85,7 +87,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
     }
 
     /// <summary>
-    ///     Updates the reaction cache when the prototypes are reloaded.
+    /// Updates the reaction cache when the prototypes are reloaded.
     /// </summary>
     /// <param name="eventArgs">The set of modified prototypes.</param>
     private void OnPrototypesReloaded(PrototypesReloadedEventArgs eventArgs)
@@ -110,30 +112,22 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         var solution = actualSolution;
         //check temperature limit
         if (solution.Temperature < reaction.MinimumTemperature)
-        {
             return false;
-        }
 
         if (solution.Temperature > reaction.MaximumTemperature)
-        {
             return false;
-        }
 
         //check if the right mixing category is used
-        if ((mixerComponent == null && reaction.MixingCategories != null) ||
+        if (mixerComponent == null && reaction.MixingCategories != null ||
             mixerComponent != null && reaction.MixingCategories != null &&
             reaction.MixingCategories.Except(mixerComponent.ReactionTypes).Any())
-        {
             return false;
-        }
 
         //check for cancellation
         var attempt = new FuzzyReactionAttemptEvent(reaction, solutionEntity);
         RaiseLocalEvent(solutionEntity, ref attempt);
         if (attempt.Cancelled)
-        {
             return false;
-        }
 
         // are all reactants in solution?
         foreach (var reactant in reaction.Reactants)
@@ -144,17 +138,15 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             // catalyst is not consumed, so will not limit the reaction. But it still needs to be present, and
             // for quantized reactions we need to have a minimum amount
             if (reactant.Value.Catalyst && reaction.Quantized && reactantQuantity < reactant.Value.Amount)
-            {
                 return false;
-            }
         }
 
         return true;
     }
 
     /// <summary>
-    ///     Perform a reaction on a solution. This assumes all reaction criteria are met.
-    ///     Removes the reactants from the solution, adds products, and returns a list of products.
+    /// Perform a reaction on a solution. This assumes all reaction criteria are met.
+    /// Removes the reactants from the solution, adds products, and returns a list of products.
     /// </summary>
     private ProtoId<ReagentPrototype>? PerformReaction(Entity<SolutionComponent> soln,
         FuzzyReactionPrototype reaction,
@@ -180,24 +172,15 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             }
         }
 
-        foreach (var reactant in reaction.Reactants)
-        {
-            if (!reactant.Value.Catalyst)
-            {
-                var amountToRemove = unitReactions * reactant.Value.Amount;
-                solution.RemoveReagent(reactant.Key, amountToRemove, ignoreReagentData: true);
-            }
-        }
-
         if (reaction.Product != null)
         {
             //compile do id
 
-           //var id = new ReagentId(reaction.Product, [reagentData]); // I dare you to uncomment this. Assembly Checker does not accept it!
-            var id = new ReagentId(reaction.Product, new());
+            //var id = new ReagentId(reaction.Product, [reagentData]); // I dare you to uncomment this. Assembly Checker does not accept it!
+            var id = new ReagentId(reaction.Product, new List<ReagentData>());
             id.Data!.Add(reagentData);
             //Create product
-            solution.AddReagent(id, reaction.ProductAmount * unitReactions);
+            solution.AddReagent(id, (reaction.ProductAmount+deviations.Sum()) * unitReactions);
             if (reaction.ConserveEnergy)
             {
                 var newCap = solution.GetHeatCapacity(_prototypeManager);
@@ -232,9 +215,9 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
     }
 
     /// <summary>
-    ///     Performs all chemical reactions that can be run on a solution.
-    ///     Removes the reactants from the solution, then returns a solution with all products.
-    ///     WARNING: Does not trigger reactions between solution and new products.
+    /// Performs all chemical reactions that can be run on a solution.
+    /// Removes the reactants from the solution, then returns a solution with all products.
+    /// WARNING: Does not trigger reactions between solution and new products.
     /// </summary>
     private bool ProcessReactions(Entity<SolutionComponent> soln,
         SortedSet<FuzzyReactionPrototype> reactions,
@@ -247,11 +230,12 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         foreach (var reaction in reactions)
         {
             var actualSolution = soln.Comp.Solution;
-
+            bool expaned = false;
             //resolve any existing amount of the reaction product to its base components (in an attempt to grow the fuzzy mixture, either with other raw material or even other fuzzy mixtures of the same solution)
             if (reaction.Product != null)
             {
                 actualSolution = actualSolution.Clone();
+
                 foreach (var splitTarget in actualSolution.Contents
                              .Where(e => e.Reagent.Prototype == reaction.Product.Value)
                              .ToArray())
@@ -259,6 +243,10 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
                     var mixtureData =
                         splitTarget.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as
                             FuzzyMixtureReagentData;
+                    var actualAmount = actualSolution.Volume;
+                    if (mixtureData != null)
+                        actualAmount = mixtureData.Mixture.Values.Sum();
+
                     //record how much we split apart
                     changed += splitTarget.Quantity;
                     //update solution
@@ -270,17 +258,18 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
                         if (mixtureData == null || mixtureData.Mixture.TryGetValue(reactant.Key, out var deviation))
                             deviation = FixedPoint2.Zero;
                         actualSolution.AddReagent(reactant.Key,
-                            (reactant.Value.Amount + deviation) * splitTarget.Quantity);
+                            (reactant.Value.Amount + deviation) * (splitTarget.Quantity-actualAmount));
                     }
+
+                    expaned = true;
                 }
             }
 
             //check basic conditions.
             if (!CanReactPrecheck(soln, reaction, mixerComponent, actualSolution))
-            {
                 continue;
-            }
-
+            if (!expaned)
+                actualSolution = soln.Comp.Solution;
             //calculate ratios.
             var amount = FindBestMatch(actualSolution, reaction, out var ratios);
             if (amount == null)
@@ -288,7 +277,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             //replace components solution with the actual solution, so that perform reaction works properly.
             soln.Comp.Solution = actualSolution;
             //check the amount of output from the reaction to see, if we actually expanded an existing solution or just recombination of self
-            changed -= amount.Value*reaction.ProductAmount;
+            changed -= amount.Value * reaction.ProductAmount;
             product = PerformReaction(soln, reaction, amount.Value, ratios);
             break;
         }
@@ -333,11 +322,11 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         deviations = reaction.Reactants.Select(e => FixedPoint2.Zero).ToArray();
         //extract variables
         var quantity = reaction.Reactants.Keys.Select(e => soln.GetTotalPrototypeQuantity(e)).ToArray();
-        var deviationLow = reaction.Reactants.Values.Select(e => e.MinAmount.HasValue ? (e.Amount - e.MinAmount) : 0)
+        var deviationLow = reaction.Reactants.Values.Select(e => e.MinAmount.HasValue ? e.MinAmount-e.Amount : 0)
             .Select(e => e!.Value)
             .ToArray();
         var amount = reaction.Reactants.Values.Select(e => e.Amount).ToArray();
-        var deviationHigh = reaction.Reactants.Values.Select(e => e.MaxAmount.HasValue ? (e.MaxAmount - e.Amount) : 0)
+        var deviationHigh = reaction.Reactants.Values.Select(e => e.MaxAmount.HasValue ? e.MaxAmount-e.Amount : 0)
             .Select(e => e!.Value)
             .ToArray();
         var maxDeviation = reaction.MaxDeviation;
@@ -405,9 +394,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
                     }
 
                     if (deviations[i] == maxDeviation)
-                    {
                         divider--;
-                    }
                 }
                 else
                 {
@@ -453,14 +440,12 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
                 continue;
             var unitReactions = quantity[i] / (amount[i] + deviations[i]);
             if (unitReactions < tMax)
-            {
                 tMax = unitReactions;
-            }
         }
     }
 
     /// <summary>
-    ///     Continually react a solution until no more reactions occur, with a volume constraint.
+    /// Continually react a solution until no more reactions occur, with a volume constraint.
     /// </summary>
     public void FullyReactSolution(Entity<SolutionComponent> soln, ReactionMixerComponent? mixerComponent = null)
     {
@@ -485,10 +470,10 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
 }
 
 /// <summary>
-///     Raised directed at the owner of a solution to determine whether the reaction should be allowed to occur.
+/// Raised directed at the owner of a solution to determine whether the reaction should be allowed to occur.
 /// </summary>
 /// <reamrks>
-///     Some solution containers (e.g., bloodstream, smoke, foam) use this to block certain reactions from occurring.
+/// Some solution containers (e.g., bloodstream, smoke, foam) use this to block certain reactions from occurring.
 /// </reamrks>
 [ByRefEvent]
 public record struct FuzzyReactionAttemptEvent(FuzzyReactionPrototype Reaction, Entity<SolutionComponent> Solution)

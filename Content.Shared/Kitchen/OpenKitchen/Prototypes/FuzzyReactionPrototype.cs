@@ -19,43 +19,55 @@ namespace Content.Shared.Kitchen.OpenKitchen.Prototypes;
 [Prototype]
 public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<FuzzyReactionPrototype>
 {
-    [ViewVariables]
-    [IdDataField]
-    public string ID { get; private set; } = default!;
-
-    [DataField("name")]
-    public string Name { get; private set; } = string.Empty;
-
     /// <summary>
-    /// Reactants required for the reaction to occur.
-    /// </summary>
-    [DataField("reactants",
-        customTypeSerializer: typeof(PrototypeIdDictionarySerializer<FuzzyReactantPrototype, ReagentPrototype>))]
-    public Dictionary<string, FuzzyReactantPrototype> Reactants = new();
-
-    /// <summary>
-    ///     The minimum temperature the reaction can occur at.
-    /// </summary>
-    [DataField("minTemp")]
-    public float MinimumTemperature = 0.0f;
-
-    /// <summary>
-    ///     If true, this reaction will attempt to conserve thermal energy.
+    /// If true, this reaction will attempt to conserve thermal energy.
     /// </summary>
     [DataField("conserveEnergy")]
     public bool ConserveEnergy = true;
 
     /// <summary>
-    ///     The maximum temperature the reaction can occur at.
+    /// Effects to be triggered when the reaction occurs.
+    /// </summary>
+    [DataField("effects")] public EntityEffect[] Effects = [];
+
+    /// <summary>
+    /// How dangerous is this effect? Stuff like bicaridine should be low, while things like methamphetamine
+    /// or potas/water should be high.
+    /// </summary>
+    [DataField("impact", serverOnly: true)]
+    public LogImpact Impact = LogImpact.Low;
+
+    /// <summary>
+    /// Total deviation from ideal ratio permitted by this recipe.
+    /// If null does not apply
+    /// </summary>
+    [DataField("maxDeviation")]
+    public FixedPoint2? MaxDeviation;
+
+    /// <summary>
+    /// The maximum temperature the reaction can occur at.
     /// </summary>
     [DataField("maxTemp")]
     public float MaximumTemperature = float.PositiveInfinity;
 
     /// <summary>
-    ///     The required mixing categories for an entity to mix the solution with for the reaction to occur
+    /// The minimum temperature the reaction can occur at.
+    /// </summary>
+    [DataField("minTemp")]
+    public float MinimumTemperature;
+
+    /// <summary>
+    /// The required mixing categories for an entity to mix the solution with for the reaction to occur
     /// </summary>
     [DataField("requiredMixerCategories")]
     public List<ProtoId<MixingCategoryPrototype>>? MixingCategories;
+
+    /// <summary>
+    /// Determines the order in which reactions occur. This should used to ensure that (in general) descriptive /
+    /// pop-up generating and explosive reactions occur before things like foam/area effects.
+    /// </summary>
+    [DataField("priority")]
+    public int Priority;
 
     /// <summary>
     /// Reagents put out by reaction. fuzzy can only have one actual outcome.
@@ -70,36 +82,21 @@ public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<Fuz
     public FixedPoint2 ProductAmount;
 
     /// <summary>
-    /// Effects to be triggered when the reaction occurs.
-    /// </summary>
-    [DataField("effects")] public EntityEffect[] Effects = [];
-
-    /// <summary>
-    /// How dangerous is this effect? Stuff like bicaridine should be low, while things like methamphetamine
-    /// or potas/water should be high.
-    /// </summary>
-    [DataField("impact", serverOnly: true)]
-    public LogImpact Impact = LogImpact.Low;
-
-    // TODO SERV3: Empty on the client, (de)serialize on the server with module manager is server module
-    [DataField("sound", serverOnly: true)] public SoundSpecifier Sound { get; private set; } =
-        new SoundPathSpecifier("/Audio/Effects/Chemistry/bubbles.ogg");
-
-    /// <summary>
     /// If true, this reaction will only consume only integer multiples of the reactant amounts. If there are not
     /// enough reactants, the reaction does not occur. Useful for spawn-entity reactions (e.g. creating cheese).
     /// </summary>
-    [DataField("quantized")] public bool Quantized = false;
+    [DataField("quantized")] public bool Quantized;
 
     /// <summary>
-    /// Determines the order in which reactions occur. This should used to ensure that (in general) descriptive /
-    /// pop-up generating and explosive reactions occur before things like foam/area effects.
+    /// Reactants required for the reaction to occur.
     /// </summary>
-    [DataField("priority")]
-    public int Priority;
+    [DataField("reactants",
+        customTypeSerializer: typeof(PrototypeIdDictionarySerializer<FuzzyReactantPrototype, ReagentPrototype>))]
+    public Dictionary<string, FuzzyReactantPrototype> Reactants = new();
 
     /// <summary>
-    /// Determines whether or not this reaction creates a new chemical (false) or if it's a breakdown for existing chemicals (true)
+    /// Determines whether or not this reaction creates a new chemical (false) or if it's a breakdown for existing chemicals
+    /// (true)
     /// Used in the chemistry guidebook to make divisions between recipes and reaction sources.
     /// </summary>
     /// <example>
@@ -109,16 +106,16 @@ public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<Fuz
     [DataField]
     public bool Source;
 
-    /// <summary>
-    /// Total deviation from ideal ratio permitted by this recipe.
-    /// If null does not apply
-    /// </summary>
-    [DataField("maxDeviation")]
-    public FixedPoint2? MaxDeviation = null;
+    [DataField("name")]
+    public string Name { get; private set; } = string.Empty;
+
+    // TODO SERV3: Empty on the client, (de)serialize on the server with module manager is server module
+    [DataField("sound", serverOnly: true)] public SoundSpecifier Sound { get; private set; } =
+        new SoundPathSpecifier("/Audio/Effects/Chemistry/bubbles.ogg");
 
 
     /// <summary>
-    ///     Comparison for creating a sorted set of reactions. Determines the order in which reactions occur.
+    /// Comparison for creating a sorted set of reactions. Determines the order in which reactions occur.
     /// </summary>
     public int CompareTo(FuzzyReactionPrototype? other)
     {
@@ -130,6 +127,10 @@ public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<Fuz
 
         return string.Compare(ID, other.ID, StringComparison.Ordinal);
     }
+
+    [ViewVariables]
+    [IdDataField]
+    public string ID { get; private set; } = default!;
 }
 
 /// <summary>
