@@ -2,6 +2,7 @@ using System.Linq;
 using Content.Shared.Chemistry.Components;
 using Content.Shared.FixedPoint;
 using Content.Shared.Kitchen.OpenKitchen.Prototypes;
+using Robust.Shared.Prototypes;
 using Robust.Shared.Serialization;
 
 namespace Content.Shared.Kitchen.OpenKitchen.Components;
@@ -37,13 +38,13 @@ public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<Mea
     /// Is used during evaluation to determine the real type.
     /// </summary>
     [DataField]
-    public MealTypePrototype MealType { get; set; }
+    public ProtoId<MealTypePrototype> MealType { get; set; } = default!;
 
     /// <summary>
     /// The meal type after evaluation.
     /// </summary>
     [DataField]
-    public string? ActualMealType { get; set; }
+    public ProtoId<MealTypePrototype>? ActualMealType { get; set; }
 
     /// <summary>
     /// The name of the meal.

@@ -10,6 +10,7 @@ namespace Content.Shared.Kitchen.OpenKitchen.Prototypes;
 [Prototype]
 public sealed partial class MealTypePrototype : IPrototype
 {
+
     /// <summary>
     /// Effects to be triggered when the meal is eaten.
     /// </summary>
@@ -25,7 +26,9 @@ public sealed partial class MealTypePrototype : IPrototype
     /// A apple is a fruit. So a recipe calling for any fruit would accept an apple.
     /// </summary>
     [DataField("parents")]
-    public List<ProtoId<MealTypePrototype>> Parents =[];
+    public ProtoId<MealTypePrototype>[]? ParentMealTypes;
+
+
 
     [ViewVariables]
     [IdDataField]
