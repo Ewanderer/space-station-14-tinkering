@@ -159,7 +159,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
 
         var energy = reaction.ConserveEnergy ? solution.GetThermalEnergy(_prototypeManager) : 0;
         //store the deviations inside the mixture (thus we can later perfectly reconstruct the underlying solution)
-        var reagentData = new FuzzyMixtureReagentData();
+        var reagentData = new FuzzyMixtureReagentData() { ReactionAmount = unitReactions };
         //Remove reactants
         var reactants = reaction.Reactants.ToArray();
         for (var i = 0; i < reaction.Reactants.Count; i++)
@@ -290,12 +290,13 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             var mixtureData =
                 splitTarget.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as
                     FuzzyMixtureReagentData;
+            //     var totalDeviation = mixtureData?.Mixture.Values.Select(e => FixedPoint2.Abs(e)).Sum() ?? FixedPoint2.Zero;
             var totalDeviation = mixtureData?.Mixture.Values.Sum() ?? FixedPoint2.Zero;
             //get the original unit reaction value.
 
             actualSolution.RemoveReagent(splitTarget);
 
-            var unitReactions = splitTarget.Quantity / (reaction.ProductAmount + totalDeviation);
+            var unitReactions = mixtureData?.ReactionAmount ?? splitTarget.Quantity / (reaction.ProductAmount + totalDeviation);
             //use ratios + deviations to regenerate solution.
             changed += splitTarget.Quantity;
 

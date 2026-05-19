@@ -9,11 +9,22 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 /// Used to store fuzzy ratios of the ingredients used to make this cooking reagent.
 /// Like how much egg, flour and milk is in pancake batter.
 /// </summary>
-[ImplicitDataDefinitionForInheritors] [Serializable] [NetSerializable]
+[ImplicitDataDefinitionForInheritors]
+[Serializable]
+[NetSerializable]
 public sealed partial class FuzzyMixtureReagentData : ReagentData
 {
+    /// <summary>
+    /// the ratios used to construct the mixture.
+    /// </summary>
     [DataField]
     public Dictionary<ProtoId<ReagentPrototype>, FixedPoint2> Mixture = [];
+
+    /// <summary>
+    /// because of rounding errors, the original reaction ammount must be stored.
+    /// </summary>
+    [DataField]
+    public FixedPoint2 ReactionAmount = FixedPoint2.Zero;
 
     public override bool Equals(ReagentData? other)
     {
@@ -41,6 +52,7 @@ public sealed partial class FuzzyMixtureReagentData : ReagentData
         return new FuzzyMixtureReagentData
         {
             Mixture = new Dictionary<ProtoId<ReagentPrototype>, FixedPoint2>(Mixture),
+            ReactionAmount = ReactionAmount,
         };
     }
 }
