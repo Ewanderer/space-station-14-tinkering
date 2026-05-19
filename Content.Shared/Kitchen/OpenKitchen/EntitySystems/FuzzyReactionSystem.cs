@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Linq;
 using Content.Shared.Administration.Logs;
+using Content.Shared.Armor;
 using Content.Shared.Chemistry.Components;
 using Content.Shared.Chemistry.Reaction;
 using Content.Shared.Chemistry.Reagent;
@@ -180,7 +181,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             var id = new ReagentId(reaction.Product, new List<ReagentData>());
             id.Data!.Add(reagentData);
             //Create product
-            solution.AddReagent(id, (reaction.ProductAmount+deviations.Sum()) * unitReactions);
+            solution.AddReagent(id, (reaction.ProductAmount + deviations.Sum()) * unitReactions);
             if (reaction.ConserveEnergy)
             {
                 var newCap = solution.GetHeatCapacity(_prototypeManager);
@@ -236,33 +237,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             {
                 actualSolution = actualSolution.Clone();
 
-                foreach (var splitTarget in actualSolution.Contents
-                             .Where(e => e.Reagent.Prototype == reaction.Product.Value)
-                             .ToArray())
-                {
-                    var mixtureData =
-                        splitTarget.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as
-                            FuzzyMixtureReagentData;
-                    var actualAmount = actualSolution.Volume;
-                    if (mixtureData != null)
-                        actualAmount = mixtureData.Mixture.Values.Sum();
-
-                    //record how much we split apart
-                    changed += splitTarget.Quantity;
-                    //update solution
-                    actualSolution.Contents.Remove(splitTarget);
-                    //reconstruct components of the solution.
-                    foreach (var reactant in reaction.Reactants)
-                    {
-                        //get deviation
-                        if (mixtureData == null || mixtureData.Mixture.TryGetValue(reactant.Key, out var deviation))
-                            deviation = FixedPoint2.Zero;
-                        actualSolution.AddReagent(reactant.Key,
-                            (reactant.Value.Amount + deviation) * (splitTarget.Quantity-actualAmount));
-                    }
-
-                    expaned = true;
-                }
+                ExpandSolution(out changed, reaction, actualSolution, out expaned);
             }
 
             //check basic conditions.
@@ -271,7 +246,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             if (!expaned)
                 actualSolution = soln.Comp.Solution;
             //calculate ratios.
-            var amount = FindBestMatch(actualSolution, reaction, out var ratios);
+            var amount = FindBalancedMatch(actualSolution, reaction, out var ratios);
             if (amount == null)
                 continue;
             //replace components solution with the actual solution, so that perform reaction works properly.
@@ -293,155 +268,145 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             reactions.UnionWith(reactantReactions);
         return true;
     }
+    /// <summary>
+    /// Given a solutuin containing the product of an fuzzy reaction prototype,
+    /// revereses the reagent back into the solution components (ignoring any catalyst.)
+    /// used mainly as a helper for growing/adjusting existing solutions.
+    /// </summary>
+    /// <param name="changed"></param>
+    /// <param name="reaction"></param>
+    /// <param name="actualSolution"></param>
+    /// <param name="expaned"></param>
+    public static void ExpandSolution(out FixedPoint2 changed, FuzzyReactionPrototype reaction, Solution actualSolution, out bool expaned)
+    {
+        changed = 0;
+        expaned = false;
+        if (!reaction.Product.HasValue || reaction.ProductAmount == FixedPoint2.Zero)
+            return;
+        foreach (var splitTarget in actualSolution.Contents
+                     .Where(e => e.Reagent.Prototype == reaction.Product!.Value)
+                     .ToArray())
+        {
+            var mixtureData =
+                splitTarget.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as
+                    FuzzyMixtureReagentData;
+            var totalDeviation = mixtureData?.Mixture.Values.Sum() ?? FixedPoint2.Zero;
+            //get the original unit reaction value.
+
+            actualSolution.RemoveReagent(splitTarget);
+
+            var unitReactions = splitTarget.Quantity / (reaction.ProductAmount + totalDeviation);
+            //use ratios + deviations to regenerate solution.
+            changed += splitTarget.Quantity;
+
+            foreach (var reactant in reaction.Reactants)
+            {
+                var deviation = mixtureData?.Mixture[reactant.Key] ?? FixedPoint2.Zero;
+                var amount = unitReactions * (reactant.Value.Amount + deviation);
+
+                actualSolution.AddReagent(reactant.Key, amount, false);
+            }
+            expaned = true;
+        }
+    }
 
     /// <summary>
-    /// Tries to match a solution best to a fuzziness reaction.
-    /// Given n∈N, n>0: Number of Reactants
-    /// Q1,...,Qn: Quantities of Reactant available in solution
-    /// A1,...,An: Ideal Amount of reactant for the reaction at t=1.
-    /// B_low_1,...,B_low_n: Lower Bound for devation of rectant n.
-    /// B_high_1,...,B_high_n: High Bound for devation of rectant n.
-    /// t∈R>0: Reaction Quantity.
-    /// maxDeviation: Total maximum allowed deviation within reaction.
-    /// d1,...,dn: Deviations of reactant i from ideal
-    /// we try to satisfy the conditions for all i 1≤i≤n:
-    /// t * (Ai*di) ≤ Qi
-    /// B_low_i ≤ di ≤ B_high_i
-    /// ∑i=1 n |di-Ai| ≤ maxDeviation
-    /// while maximising t by adjusting di
+    /// Given a solution maximise the reaction, before getting the error.
     /// </summary>
     /// <param name="soln"></param>
     /// <param name="reaction"></param>
-    /// <param name="deviations">the di values</param>
-    /// <returns>The total reaction amount, aka factor by which to execute (Ai*di)</returns>
-    private FixedPoint2? FindBestMatch(Solution soln,
-        FuzzyReactionPrototype reaction,
-        out FixedPoint2[] deviations)
+    /// <param name="deviations"></param>
+    /// <returns></returns>
+    private FixedPoint2? FindBalancedMatch(Solution soln, FuzzyReactionPrototype reaction, out FixedPoint2[] deviations)
     {
-        //setup with 0 deviation
+        //calcuate deviations
         deviations = reaction.Reactants.Select(e => FixedPoint2.Zero).ToArray();
-        //extract variables
+        //get available data
         var quantity = reaction.Reactants.Keys.Select(e => soln.GetTotalPrototypeQuantity(e)).ToArray();
-        var deviationLow = reaction.Reactants.Values.Select(e => e.MinAmount.HasValue ? e.MinAmount-e.Amount : 0)
+
+        var coefficents = reaction.Reactants.Values.Select(e => e.Amount).ToArray();
+        //calculate limits
+        var deviationLow = reaction.Reactants.Values.Select(e => e.MinAmount.HasValue ? e.MinAmount - e.Amount : 0)
+              .Select(e => e!.Value)
+              .ToArray();
+        var deviationHigh = reaction.Reactants.Values.Select(e => e.MaxAmount.HasValue ? e.MaxAmount - e.Amount : 0)
             .Select(e => e!.Value)
             .ToArray();
-        var amount = reaction.Reactants.Values.Select(e => e.Amount).ToArray();
-        var deviationHigh = reaction.Reactants.Values.Select(e => e.MaxAmount.HasValue ? e.MaxAmount-e.Amount : 0)
-            .Select(e => e!.Value)
-            .ToArray();
-        var maxDeviation = reaction.MaxDeviation;
-        var catalyst = reaction.Reactants.Values.Select(e => e.Catalyst).ToArray();
-        //get maximum at idea value (deviations are all 0)
-        var tMax = FixedPoint2.MaxValue;
-        CalculateTMax(reaction, deviations, catalyst, quantity, amount, ref tMax);
-        //round if quantized
-        if (reaction.Quantized)
-            tMax = (int)tMax;
-        if (tMax == FixedPoint2.Zero)
+
+        //Get local T at minimum, maximum and optimum foreach reactant to the solution content.
+        //at amout t would be optimal
+        var optimums = reaction.Reactants.Values.Select((e, idx) => quantity[idx] / e.Amount).ToArray();
+        //at min amount -> t would be maximal
+        var maximums = reaction.Reactants.Values.Select((e, idx) => e.MinAmount.HasValue ? quantity[idx] / e.MinAmount.Value : optimums[idx]).ToArray();
+        //at max amout t would be minimal
+        var minimums = reaction.Reactants.Values.Select((e, idx) => e.MaxAmount.HasValue ? quantity[idx] / e.MaxAmount.Value : optimums[idx]).ToArray();
+
+        //pick the average Optimum T and clamp to minimum and maxium
+        var bestOptimum = optimums.Sum() / optimums.Length;
+        for (var i = 0; i < optimums.Length; i++)
         {
-            //if failed -> try at minimum
-            deviations = deviationLow.ToArray();
-            CalculateTMax(reaction, deviations, catalyst, quantity, amount, ref tMax);
-            //round if quantized
-            if (reaction.Quantized)
-                tMax = (int)tMax;
-            //still no good reaction not good.
-            if (tMax == FixedPoint2.Zero)
-                return null;
+            //constraint into smaller and smaller windows
+            bestOptimum = FixedPoint2.Clamp(bestOptimum, minimums[i], maximums[i]);
         }
-        //if succeeded feed any available reminder into deviation while within the limits
-
-        //iteratively approach a good solution. a solution is stable when no more deviation changes are possible.
-        var divider =
-            reaction.Reactants.Count; //slowly increase max step size as we eliminate potential deviation candidates.
-        while (divider > 0)
+        if (bestOptimum == FixedPoint2.Zero)
+            return null;
+        //generate deviations at i with respect to maximum deviation
+        for (var i = 0; i < deviations.Length; i++)
         {
-            var totalAbsoluteDeviation = FixedPoint2.FromCents(deviations.Sum(e => Math.Abs(e.Value)));
-            for (var i = 0; i < reaction.Reactants.Count; i++)
-            {
-                //calculate the remainder
-                var remainderToShift = (quantity[i] - (deviations[i] + amount[i]) * tMax) / tMax;
-                //skip over if no remainder
-                if (remainderToShift == FixedPoint2.Zero)
-                {
-                    divider--;
-                    continue;
-                }
+            var remainder = (quantity[i] - (bestOptimum * coefficents[i])) / bestOptimum;
 
-                //allow shifting up
-                if (reaction.MaxDeviation.HasValue)
-                {
-                    //we can in one iteration only move a little.
-                    var allowedShift = totalAbsoluteDeviation / divider;
-                    if (allowedShift == FixedPoint2.Zero)
-                    {
-                        divider--;
-                        continue;
-                    }
-
-                    if (totalAbsoluteDeviation > reaction.MaxDeviation.Value && deviations[i] < 0)
-                    {
-                        //we need! to absorb remainder until deviation is 0
-                        deviations[i] = FixedPoint2.Min(deviations[i] + allowedShift, 0);
-                    }
-                    else if (totalAbsoluteDeviation < reaction.MaxDeviation.Value && deviations[i] < maxDeviation)
-                    {
-                        //we can absorb reminder up to maximum deviation.
-                        allowedShift = FixedPoint2.Min(allowedShift,
-                            reaction.MaxDeviation.Value - totalAbsoluteDeviation);
-                        //of course only to local limit
-                        deviations[i] = FixedPoint2.Min(deviations[i] + allowedShift, deviationHigh[i]);
-                    }
-
-                    if (deviations[i] == maxDeviation)
-                        divider--;
-                }
-                else
-                {
-                    //move to maximum deviation
-                    deviations[i] = FixedPoint2.Min(deviations[i] + remainderToShift, deviationHigh[i]);
-                    divider--;
-                }
-            }
-        }
-
-        {
-            //validate solution of t + deviations just in case
-            var totalAbsoluteDeviation = FixedPoint2.Zero;
-            for (var i = 0; i < reaction.Reactants.Count; i++)
-            {
-                //check bounds of deviation
-                if (deviations[i] < deviationLow[i] || deviationHigh[i] < deviations[i])
-                    return null;
-                //check limit of q.
-                if (tMax * (amount[i] + deviations[i]) > quantity[i])
-                    return null;
-                //sum deviations together
-                totalAbsoluteDeviation += FixedPoint2.Abs(deviations[i]);
-            }
-
-            //validate deviation does not exceed maximum
-            if (maxDeviation.HasValue && totalAbsoluteDeviation > maxDeviation)
-                return null;
-        }
-        return tMax;
-    }
-
-    private static void CalculateTMax(FuzzyReactionPrototype reaction,
-        FixedPoint2[] deviations,
-        bool[] catalyst,
-        FixedPoint2[] quantity,
-        FixedPoint2[] amount,
-        ref FixedPoint2 tMax)
-    {
-        for (var i = 0; i < reaction.Reactants.Count; i++)
-        {
-            if (catalyst[i])
+            deviations[i] = FixedPoint2.Clamp(remainder, deviationLow[i], deviationHigh[i]);
+            //skip if 0
+            if (remainder == FixedPoint2.Zero)
                 continue;
-            var unitReactions = quantity[i] / (amount[i] + deviations[i]);
-            if (unitReactions < tMax)
-                tMax = unitReactions;
         }
+        //adjust deviations until they meet maximum deviation requirement.
+        if (reaction.MaxDeviation.HasValue && reaction.MaxDeviation < deviations.Select(e => FixedPoint2.Abs(e)).Sum())
+        {
+            var dividers = deviations.Count(e => e != FixedPoint2.Zero);
+            while (dividers > 0)
+            {
+                //check how much deviation is happening
+                var deviationBudget = deviations.Select(e => FixedPoint2.Abs(e)).Sum();
+                //if within limits, we are done.
+                if (deviationBudget <= reaction.MaxDeviation)
+                    return bestOptimum;
+                //split burden equally by all dividers.
+                var allowedShift = deviationBudget / dividers;
+                if (allowedShift == FixedPoint2.Zero)
+                {
+                    //cannot reach shift requirement.
+                    return null;
+                }
+                for (var i = 0; i < deviations.Length; i++)
+                {
+                    //skip already optimal ingredients
+                    if (deviations[i] == FixedPoint2.Zero)
+                        continue;
+                    //move closer to 0
+                    if (deviations[i] < 0)
+                    {
+                        deviations[i] = FixedPoint2.Min(0, deviations[i] + allowedShift);
+                    }
+                    else
+                    {
+                        deviations[i] = FixedPoint2.Max(0, deviations[i] - allowedShift);
+                    }
+                    //once at 0, we archived peak error absorption.
+                    if (deviations[i] == FixedPoint2.Zero)
+                    {
+                        dividers--;
+                        break;
+                    }
+                }
+            }
+            //burden cannot be split anymore and yet max error to big. reaction not viable.
+            if (reaction.MaxDeviation < deviations.Select(e => FixedPoint2.Abs(e)).Sum())
+                return null;
+        }
+
+        //return best t.
+        return bestOptimum;
     }
 
     /// <summary>
