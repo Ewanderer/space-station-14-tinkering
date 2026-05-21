@@ -35,6 +35,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
 
     [Dependency] private INetManager _netMan = default!;
     [Dependency] private IPrototypeManager _prototypeManager = default!;
+    [Dependency] private SharedMealSystem _sharedMealSystem = default!;
 
     /// <summary>
     /// A cache of all reactions indexed by one of their required reactants.
@@ -179,7 +180,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
 
             //var id = new ReagentId(reaction.Product, [reagentData]); // I dare you to uncomment this. Assembly Checker does not accept it!
             var id = new ReagentId(reaction.Product, new List<ReagentData>());
-            id.Data!.Add(reagentData);
+            id.Data!.Add(reagentData.Clone());
             //Create product
             solution.AddReagent(id, (reaction.ProductAmount + deviations.Sum()) * unitReactions);
             if (reaction.ConserveEnergy)
@@ -191,6 +192,28 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
         }
 
         OnReaction(soln, reaction, null, unitReactions);
+
+        //spawn and setup output entity (bread dough)
+        if (reaction.OutputEntity.HasValue && reaction.Product.HasValue)
+        {
+            FixedPoint2 removed = FixedPoint2.Zero;
+            while (true)
+            {
+                //remove product
+                removed = soln.Comp.Solution.RemoveReagent(reaction.Product, reaction.ProductAmount);
+                //if product has been exhausted, stop
+                if (removed == 0)
+                    break;
+                //create entity
+                var spawnedEntity = SpawnNextToOrDrop(reaction.OutputEntity.Value, soln);
+                //add meal node
+                var component = EnsureComp<MealTreeContainerComponent>(spawnedEntity);
+                //setup meal node
+                var quantity = new ReagentQuantity(reaction.Product, removed, new());
+                quantity.Reagent.Data!.Add(reagentData.Clone());
+                component.MealTree = _sharedMealSystem.MakeNodeFromReagentQuantity(quantity);
+            }
+        }
 
         return reaction.Product;
     }
@@ -303,6 +326,8 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             foreach (var reactant in reaction.Reactants)
             {
                 var deviation = mixtureData?.Mixture[reactant.Key] ?? FixedPoint2.Zero;
+                //recreate original ammount and scale to current remaining volume.
+              //  var amount = unitReactions * (reactant.Value.Amount + deviation) * (unitReactions / splitTarget.Quantity);
                 var amount = unitReactions * (reactant.Value.Amount + deviation);
 
                 actualSolution.AddReagent(reactant.Key, amount, false);

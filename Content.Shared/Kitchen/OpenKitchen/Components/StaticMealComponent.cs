@@ -9,10 +9,14 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 /// <summary>
 /// This is the first clue to the shared meal system,
 /// what container type to assign for this entity.
+/// Explicit quantized food items like apples are given this.
+/// For solutions that turn into meals, see ReagentMealPrototype
 /// </summary>
-[RegisterComponent] [NetworkedComponent]
-public sealed partial class ProtoMealComponent : Component
+[RegisterComponent]
+[NetworkedComponent]
+public sealed partial class StaticMealComponent : Component
 {
+
     public enum HullSourceOption
     {
         NoHull,

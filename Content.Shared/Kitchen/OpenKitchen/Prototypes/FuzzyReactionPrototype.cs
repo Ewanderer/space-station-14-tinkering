@@ -31,6 +31,12 @@ public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<Fuz
     [DataField("effects")] public EntityEffect[] Effects = [];
 
     /// <summary>
+    /// If set will for every time the reaction occured spawn an entity that will have a setup meal node given one set of output reagent.
+    /// </summary>
+    [DataField("outputEntity")]
+    public EntProtoId? OutputEntity = null;
+
+    /// <summary>
     /// How dangerous is this effect? Stuff like bicaridine should be low, while things like methamphetamine
     /// or potas/water should be high.
     /// </summary>
@@ -110,7 +116,8 @@ public sealed partial class FuzzyReactionPrototype : IPrototype, IComparable<Fuz
     public string Name { get; private set; } = string.Empty;
 
     // TODO SERV3: Empty on the client, (de)serialize on the server with module manager is server module
-    [DataField("sound", serverOnly: true)] public SoundSpecifier Sound { get; private set; } =
+    [DataField("sound", serverOnly: true)]
+    public SoundSpecifier Sound { get; private set; } =
         new SoundPathSpecifier("/Audio/Effects/Chemistry/bubbles.ogg");
 
 

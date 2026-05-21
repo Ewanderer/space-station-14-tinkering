@@ -4,6 +4,7 @@ using Content.Shared.Chemistry.Reagent;
 using Content.Shared.FixedPoint;
 using Content.Shared.Kitchen.Components;
 using Content.Shared.Kitchen.OpenKitchen.Components;
+using Content.Shared.Kitchen.OpenKitchen.Prototypes;
 using Robust.Shared.Prototypes;
 
 namespace Content.Shared.Kitchen.OpenKitchen.EntitySystems;
@@ -31,6 +32,33 @@ public sealed partial class SharedMealSystem : EntitySystem
 
 
     [Dependency] private IPrototypeManager _proto = default!;
+
+    private ReagentMealPrototype _fallbackPrototype = default!;
+
+    static readonly ProtoId<ReagentMealPrototype> FallbackPrototypeId = "QuestionableIngredient";
+
+    Dictionary<ProtoId<ReagentPrototype>, ReagentMealPrototype> _reagentsToMealDictionary = new();
+
+    public override void Initialize()
+    {
+        base.Initialize();
+     //   _fallbackPrototype = _proto.Index(FallbackPrototypeId);
+        InitializeReagentsToMealDictionary();
+        SubscribeLocalEvent<PrototypesReloadedEventArgs>(OnPrototypesReloaded);
+    }
+
+    private void OnPrototypesReloaded(PrototypesReloadedEventArgs eventArgs)
+    {
+        if (eventArgs.WasModified<ReagentMealPrototype>())
+            InitializeReagentsToMealDictionary();
+    }
+
+    private void InitializeReagentsToMealDictionary()
+    {
+        _reagentsToMealDictionary.Clear();
+        foreach (var prototype in _proto.EnumeratePrototypes<ReagentMealPrototype>())
+            _reagentsToMealDictionary.Add(prototype.Reagent, prototype);
+    }
 
     /// <summary>
     /// A unified mapping of Cookedness to the description of the meals node degree of cookedness.
@@ -82,16 +110,44 @@ public sealed partial class SharedMealSystem : EntitySystem
         }
 
         //make a container from the remainder of removed solution.
-        MakeContainerFromSolution(removedSolution);
+        foreach (var item in removedSolution.Contents)
+            meal.Ingredients.Add(MakeNodeFromReagentQuantity(item));
         //fill meal volume.
         meal.Volume += removedAmount;
-        //update meal tree
-        EvaluateMealTree(meal);
+        //put meal try on delayed update.
+        MarkDirty(meal);
+    }
+
+    private void MarkDirty(MealNode node)
+    {
+
     }
 
     private void SetupMealFromHullSolution(MealNode meal)
     {
-        //find the
+        if (meal.HullSolution == null || meal.HullSolution.Contents.Count > 1)
+            return;
+        var hull = meal.HullSolution.First();
+        //find the matching recipe or use fallback.
+        if (!_reagentsToMealDictionary.TryGetValue(hull.Reagent.Prototype, out var mealPrototype))
+            mealPrototype = _fallbackPrototype;
+
+        FixedPoint2 mixtureCapacityFactor = 1;
+        FixedPoint2 mixtureFlavorFactor = 1;
+        var mixture = (hull.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as FuzzyMixtureReagentData)?.Mixture;
+        //evaluate fuzzyness of mixture to adjust key hull statistics.
+        foreach (var part in mealPrototype.FuzzyFactors)
+        {
+            if (mixture == null || !mixture.TryGetValue(part.Reagent, out var deviation))
+                deviation = 0;
+            deviation = FixedPoint2.Clamp(deviation, part.Minimum, part.Maximum);
+            var t = (deviation - part.Minimum) / (part.Maximum - part.Minimum);
+            if (part.CapacityFactorAtMaximum.HasValue && part.CapacityFactorAtMinimum.HasValue)
+                mixtureCapacityFactor *= part.CapacityFactorAtMinimum.Value + t * (part.CapacityFactorAtMaximum.Value - part.CapacityFactorAtMinimum.Value);
+        }
+
+        //setup total capacity.
+        meal.Capacity = mealPrototype.CapacityFactor * hull.Quantity * mixtureCapacityFactor;
     }
 
     /// <summary>
@@ -108,9 +164,9 @@ public sealed partial class SharedMealSystem : EntitySystem
         if (remainingSpace <= 0)
             return false;
         // check if entity has proto meal component
-        if (TryComp(entity, out ProtoMealComponent? protoMeal))
+        if (TryComp(entity, out StaticMealComponent? protoMeal))
         {
-            var protoMealContainer = MakeMealFromProtoMeal(new Entity<ProtoMealComponent>(entity, protoMeal));
+            var protoMealContainer = MakeMealFromProtoMeal(new Entity<StaticMealComponent>(entity, protoMeal));
             //check capacity vs meal
             if (protoMealContainer.Volume > remainingSpace)
                 return false;
@@ -153,27 +209,31 @@ public sealed partial class SharedMealSystem : EntitySystem
             return false;
 
         //check is reagent prototype is equal
-        if (reagentId.Equals(mealNode.HullSolution.Contents.First().Reagent))
+        if (reagentId.Prototype != mealNode.HullSolution.Contents.First().Reagent.Prototype)
+            return false;
+        //check if there is a mixture that can/must be expanded.
+        var mixture = reagentId.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData);
+        if (mixture != null && !mixture.Equals(mealNode.HullSolution.Contents.First().Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData)))
             return false;
 
         return true;
     }
 
-    private MealNode MakeMealFromProtoMeal(Entity<ProtoMealComponent> protoMeal)
+    private MealNode MakeMealFromProtoMeal(Entity<StaticMealComponent> protoMeal)
     {
         Solution? solution = null;
         switch (protoMeal.Comp.HullSource)
         {
-            case ProtoMealComponent.HullSourceOption.NoHull:
+            case StaticMealComponent.HullSourceOption.NoHull:
                 break;
-            case ProtoMealComponent.HullSourceOption.ProtoMealComponent:
+            case StaticMealComponent.HullSourceOption.ProtoMealComponent:
                 solution = protoMeal.Comp.HullSolution;
                 break;
-            case ProtoMealComponent.HullSourceOption.ExtractableComponent:
+            case StaticMealComponent.HullSourceOption.ExtractableComponent:
                 if (TryComp(protoMeal, out ExtractableComponent? extractableComponent))
                     solution = extractableComponent.JuiceSolution;
                 break;
-            case ProtoMealComponent.HullSourceOption.SolutionComponent:
+            case StaticMealComponent.HullSourceOption.SolutionComponent:
                 if (TryComp(protoMeal, out SolutionComponent? solutionComponent))
                     solution = solutionComponent.Solution;
                 break;
@@ -190,8 +250,11 @@ public sealed partial class SharedMealSystem : EntitySystem
         };
     }
 
-    public MealNode MakeContainerFromSolution(Solution solution)
+    public MealNode MakeNodeFromReagentQuantity(ReagentQuantity reagtentQuantity)
     {
-        throw new NotImplementedException();
+        //check
+        var mealNode = new MealNode() { HullSolution = new Solution([reagtentQuantity]) };
+        SetupMealFromHullSolution(mealNode);
+        return mealNode;
     }
 }

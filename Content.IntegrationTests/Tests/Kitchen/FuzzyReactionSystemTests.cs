@@ -561,7 +561,7 @@ public sealed class FuzzyReactionSystemTests : GameTest
                 .ToArray();
             //check the difference, it should be for all potential items in solution less than 0.5
             Assert.That(expectedProducts.All(e => FixedPoint2.Abs(solution.GetTotalPrototypeQuantity(e.Item1) - e.Item2 * multiple) < 0.5));
-            
+
             Assert.That(expectedProducts.Count() >= solution.Contents.Count());
             var fuzzyProductMixture = solution.Contents.FirstOrDefault(e => e.Reagent.Prototype == reactionPrototype.Product.Value);
             var mixtureData = fuzzyProductMixture.Reagent.Data?.FirstOrDefault(e => e is FuzzyMixtureReagentData) as FuzzyMixtureReagentData;
@@ -572,5 +572,104 @@ public sealed class FuzzyReactionSystemTests : GameTest
             server.EntMan.DeleteEntity(beaker);
         });
     }
+
+    [Test]
+    [TestCaseSource(nameof(_reactions))]
+    [TestOf(typeof(FuzzyReactionPrototype))]
+    [Description("Tries an individual fuzzy reaction to see if it succeeds.")]
+    public async Task TryRecombinationReaction(string reaction)
+    {
+        var pair = Pair;
+        var server = pair.Server;
+
+        var entityManager = server.ResolveDependency<IEntityManager>();
+        var prototypeManager = server.ResolveDependency<IPrototypeManager>();
+        var testMap = await pair.CreateTestMap();
+        var coordinates = testMap.GridCoords;
+        var solutionContainerSystem = entityManager.System<SharedSolutionContainerSystem>();
+        var fuzzyReactionSystem = server.System<FuzzyReactionSystem>();
+
+        var reactionPrototype = prototypeManager.Index<FuzzyReactionPrototype>(reaction);
+
+        EntityUid beaker = default;
+        Solution solution = null;
+        Entity<SolutionComponent>? solutionEnt = default!;
+
+        await server.WaitAssertion(() =>
+        {
+            beaker = entityManager.SpawnEntity("TestSolutionContainer", coordinates);
+            Assert.That(solutionContainerSystem
+                .TryGetSolution(beaker, "beaker", out solutionEnt, out solution));
+            solutionContainerSystem.SetCanReact(solutionEnt!.Value, false);
+            foreach (var (id, reactant) in reactionPrototype.Reactants)
+            {
+#pragma warning disable NUnit2045
+                Assert.That(solutionContainerSystem
+                    .TryAddReagent(solutionEnt.Value,
+                        id,
+                        reactant.Amount,
+                        out var quantity,
+                        reactionPrototype.MinimumTemperature));
+                Assert.That(reactant.Amount, Is.EqualTo(quantity));
+#pragma warning restore NUnit2045
+            }
+
+
+
+            //Now safe set the temperature and mix the reagents
+            solutionContainerSystem.SetTemperature(solutionEnt.Value, reactionPrototype.MinimumTemperature);
+            solutionContainerSystem.SetCanReact(solutionEnt.Value, true);
+
+            if (reactionPrototype.MixingCategories != null)
+            {
+                var dummyEntity = entityManager.SpawnEntity(null, MapCoordinates.Nullspace);
+                var mixerComponent = entityManager.AddComponent<ReactionMixerComponent>(dummyEntity);
+                mixerComponent.ReactionTypes = reactionPrototype.MixingCategories;
+                solutionContainerSystem.UpdateChemicals(solutionEnt.Value, true, mixerComponent);
+            }
+
+            //now split in 2
+            var split = solutionEnt.Value.Comp.Solution.SplitSolution(solutionEnt.Value.Comp.Solution.Volume / 2);
+            //expand split without allowing recombination
+            split.CanReact = false;
+            //mix back in.
+            FuzzyReactionSystem.ExpandSolution(out _, reactionPrototype, split, out _);
+
+            solutionEnt.Value.Comp.Solution.AddSolution(split, prototypeManager);
+
+            //force reaction again.
+            solutionContainerSystem.SetTemperature(solutionEnt.Value, reactionPrototype.MinimumTemperature);
+            solutionContainerSystem.SetCanReact(solutionEnt.Value, true);
+
+            if (reactionPrototype.MixingCategories != null)
+            {
+                var dummyEntity = entityManager.SpawnEntity(null, MapCoordinates.Nullspace);
+                var mixerComponent = entityManager.AddComponent<ReactionMixerComponent>(dummyEntity);
+                mixerComponent.ReactionTypes = reactionPrototype.MixingCategories;
+                solutionContainerSystem.UpdateChemicals(solutionEnt.Value, true, mixerComponent);
+            }
+        });
+
+        await server.WaitIdleAsync();
+
+        await server.WaitAssertion(() =>
+        {
+            //assert we have obtained the correct product in the correct amout.
+            var expectedProducts = reactionPrototype.Reactants
+                .Where(e => e.Value.Catalyst)
+                .Select(e => (e.Key, e.Value.Amount))
+                .Append((reactionPrototype.Product, reactionPrototype.ProductAmount))
+                .Where(e => !string.IsNullOrWhiteSpace(e.Key))
+                .ToArray();
+            solution = solutionEnt.Value.Comp.Solution;
+
+            Assert.That(expectedProducts.All(e => solution.GetTotalPrototypeQuantity(e.Key) == e.Amount));
+            Assert.That(expectedProducts.Count() == solution.Contents.Count());
+          //  Assert.That(solution.Contents.Any(e=>e.Reagent.Data?.Any(d=)))
+
+            server.EntMan.DeleteEntity(beaker);
+        });
+    }
+
 
 }
