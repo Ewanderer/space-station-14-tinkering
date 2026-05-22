@@ -13,7 +13,8 @@ namespace Content.Shared.Kitchen.OpenKitchen.Components;
 /// They hold the data about the cooking progress. (Thermals)
 /// </summary>
 [DataDefinition]
-[Serializable] [NetSerializable]
+[Serializable]
+[NetSerializable]
 public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<MealNode>
 {
     /// <summary>
@@ -29,6 +30,14 @@ public sealed partial class MealNode : ISerializationHooks, IRobustCloneable<Mea
     /// </summary>
     [DataField]
     public ProtoId<MealTypePrototype>? ActualMealType { get; set; }
+    /// <summary>
+    /// Quality setup from hull/input object
+    /// </summary>
+    [DataField]
+    public FixedPoint2 BaseQuality { get; set; }
+
+    [DataField]
+    public FixedPoint2 ActualQuality { get; set; }
 
     /// <summary>
     /// The name of the meal.

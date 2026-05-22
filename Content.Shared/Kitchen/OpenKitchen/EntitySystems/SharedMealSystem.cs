@@ -114,13 +114,6 @@ public sealed partial class SharedMealSystem : EntitySystem
             meal.Ingredients.Add(MakeNodeFromReagentQuantity(item));
         //fill meal volume.
         meal.Volume += removedAmount;
-        //put meal try on delayed update.
-        MarkDirty(meal);
-    }
-
-    private void MarkDirty(MealNode node)
-    {
-
     }
 
     private void SetupMealFromHullSolution(MealNode meal)
@@ -172,7 +165,6 @@ public sealed partial class SharedMealSystem : EntitySystem
                 return false;
             meal.Ingredients.Add(protoMealContainer);
             meal.Volume += protoMealContainer.Volume;
-            EvaluateMealTree(meal);
             return true;
         }
 
@@ -196,8 +188,9 @@ public sealed partial class SharedMealSystem : EntitySystem
     /// Sets the actual values of a meal node
     /// </summary>
     /// <param name="target"></param>
-    private void EvaluateMealTree(MealNode target)
+    public void EvaluateMealTree(MealNode target)
     {
+
     }
 
     private bool ReagentCanBeAddedToHull(ReagentId reagentId, MealNode mealNode)
