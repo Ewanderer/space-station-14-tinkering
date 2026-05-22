@@ -327,8 +327,7 @@ public sealed partial class FuzzyReactionSystem : EntitySystem
             {
                 var deviation = mixtureData?.Mixture[reactant.Key] ?? FixedPoint2.Zero;
                 //recreate original ammount and scale to current remaining volume.
-              //  var amount = unitReactions * (reactant.Value.Amount + deviation) * (unitReactions / splitTarget.Quantity);
-                var amount = unitReactions * (reactant.Value.Amount + deviation);
+                var amount = unitReactions * (reactant.Value.Amount + deviation) * (splitTarget.Quantity / (unitReactions * reaction.ProductAmount));
 
                 actualSolution.AddReagent(reactant.Key, amount, false);
             }
