@@ -568,6 +568,7 @@
 
 - type: reaction
   id: IceCream
+  maxTemp: 258.15
   reactants:
     Cream:
       amount: 1
@@ -577,6 +578,17 @@
       amount: 1
   products:
     IceCream: 3
+
+- type: reaction
+  id: IceCreamMelting
+  minTemp: 274.15
+  reactants:
+    IceCream:
+      amount: 3
+  products:
+    Cream: 1
+    Ice: 1
+    Sugar: 1
 
 - type: reaction
   id: IcedBeer
@@ -597,6 +609,21 @@
       amount: 1
   products:
     IcedBeer: 10
+  effects:
+  - !type:AdjustSolutionTemperature # remove heat to stop reaction on repeated recombination during electrolysis
+    delta: -250 # actual energy requirement of reaction, works surprisingly well.
+    minTemp: 243.15
+
+
+- type: reaction
+  id: IcedBeerMelting
+  minTemp: 274.15
+  reactants:
+    IcedBeer:
+      amount: 5
+  products:
+    Beer: 5
+    Ice: 1
 
 - type: reaction
   id: IcedCoffee
@@ -609,6 +636,16 @@
     IcedCoffee: 3
 
 - type: reaction
+  id: IcedCoffeeMelting
+  minTemp: 274.15
+  reactants:
+    IcedCoffee:
+      amount: 3
+  products:
+    Coffee: 2
+    Ice: 1
+
+- type: reaction
   id: IcedGreenTea
   reactants:
     GreenTea:
@@ -619,6 +656,16 @@
     IcedGreenTea: 3
 
 - type: reaction
+  id: IcedGreenTeaMelting
+  minTemp: 274.15
+  reactants:
+    IcedGreenTea:
+      amount: 3
+  products:
+    GreenTea: 2
+    Ice: 1
+
+- type: reaction
   id: IcedTea
   reactants:
     Ice:
@@ -627,6 +674,16 @@
       amount: 2
   products:
     IcedTea: 3
+
+- type: reaction
+  id: IcedTeaMelting
+  minTemp: 274.15
+  reactants:
+    IcedTea:
+      amount: 3
+  products:
+    Ice: 1
+    Tea: 2
 
 - type: reaction
   id: IrishBool

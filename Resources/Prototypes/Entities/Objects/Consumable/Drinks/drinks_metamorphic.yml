@@ -925,6 +925,7 @@
         reagents:
         - ReagentId: IcedTea
           Quantity: 30
+        temperature: 248.15
   - type: Icon
     sprite: Objects/Consumable/Drinks/icedteaglass.rsi
     state: icon
@@ -939,6 +940,7 @@
         reagents:
         - ReagentId: IcedBeer
           Quantity: 30
+        temperature: 248.15
   - type: Icon
     sprite: Objects/Consumable/Drinks/iced_beerglass.rsi
     state: icon
@@ -953,6 +955,7 @@
         reagents:
         - ReagentId: Ice
           Quantity: 30
+        temperature: 248.15
   - type: Icon
     sprite: Objects/Consumable/Drinks/iceglass.rsi
     state: icon
@@ -967,6 +970,7 @@
         reagents:
         - ReagentId: IceCream
           Quantity: 30
+        temperature: 248.15
   - type: Icon
     sprite: Objects/Consumable/Drinks/icecreamglass.rsi
     state: icon

@@ -42,6 +42,7 @@
       reagents:
       - ReagentId: Ice
         Quantity: 240
+      temperature: 223.15
   - type: Sprite
     sprite: Objects/Consumable/Drinks/icebucket.rsi
     state: icon

@@ -105,6 +105,7 @@
       reagents:
       - ReagentId: IcedTea
         Quantity: 40
+      temperature: 248.15
   - type: Sprite
     sprite: Objects/Consumable/Drinks/ice_tea_can.rsi
   - type: Item
@@ -370,6 +371,7 @@
         Quantity: 25
       - ReagentId: Ice
         Quantity: 5
+    temperature: 248.15
   - type: Sprite
     sprite: Objects/Consumable/Drinks/robustnukie.rsi
   - type: Item

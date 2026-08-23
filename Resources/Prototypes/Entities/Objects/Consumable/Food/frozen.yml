@@ -169,6 +169,7 @@
             Quantity: 2
           - ReagentId: Sugar
             Quantity: 2
+        temperature: 248.15
 
 - type: entity
   name: flavorless snowcone
@@ -181,7 +182,7 @@
       reagents:
         - ReagentId: Ice
           Quantity: 8
-
+      temperature: 248.15
 - type: entity
   name: berry snowcone
   parent: FoodFrozenSnowconeBase

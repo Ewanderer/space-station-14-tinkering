@@ -73,3 +73,15 @@
       amount: 1
   products:
     Hivarol: 1
+
+- type: reaction
+  id: MeltingIce
+  minTemp: 274.15
+  reactants:
+    Ice:
+      amount: 1
+  products:
+    Water: 1
+  effects:
+  - !type:AdjustSolutionThermalEnergy
+    delta: -334

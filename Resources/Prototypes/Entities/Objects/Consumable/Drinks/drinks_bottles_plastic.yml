@@ -218,6 +218,7 @@
       reagents:
       - ReagentId: Ice
         Quantity: 240
+      temperature: 248.15
   - type: Label
     localizedLabel: reagent-name-ice
   # TODO new sprite
