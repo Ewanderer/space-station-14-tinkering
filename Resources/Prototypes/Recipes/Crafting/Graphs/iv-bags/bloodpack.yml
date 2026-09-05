@@ -1,0 +1,30 @@
+- type: constructionGraph
+  id: IVBags
+  start: start
+  graph:
+  - node: start
+    edges:
+    - to: empty
+      steps:
+      - tag: EmptyIVBag
+        name: empty iv bag pack
+        icon:
+          sprite: Objects/Specific/Medical/medical.rsi
+          state: bloodpack-empty
+        doAfter: 0.1
+  - node: empty
+    entity: EmptyIVBagPack
+    edges:
+    - to: done
+      conditions:
+      - !type:MinSolution
+        solution: ivbag
+        reagent:
+          ReagentId: WeldingFuel
+        quantity: 40
+      steps:
+      - material: Steel
+        amount: 1
+        doAfter: 0.1
+  - node: done
+    entity: Bloodpack

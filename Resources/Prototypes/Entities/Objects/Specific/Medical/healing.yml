@@ -244,6 +244,9 @@
     count: 10
   - type: StackPrice
     price: 10
+  - type: Construction
+    graph: IVBags
+    node: done
 
 - type: entity
   parent: Bloodpack

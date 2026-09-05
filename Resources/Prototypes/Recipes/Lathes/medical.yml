@@ -66,6 +66,13 @@
     Plastic: 25
 
 - type: latheRecipe
+  id: EmptyIVBagPack
+  result: EmptyIVBagPack
+  completetime: 1
+  materials:
+    Plastic: 25
+
+- type: latheRecipe
   id: Gauze
   result: Gauze1
   completetime: 1

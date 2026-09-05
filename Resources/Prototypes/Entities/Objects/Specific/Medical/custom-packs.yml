@@ -1,0 +1,39 @@
+- type: entity
+  name: empty iv bag pack
+  description: A set of empty IV bags that can be used for transfusions.
+  parent: [BaseItem, SolutionIVBag, SolutionSmall]
+  id: EmptyIVBagPack
+  suffix: Empty
+  components:
+  - type: Tag
+    tags:
+    - IVBag
+    - EmptyIVBag
+  - type: Appearance
+  - type: Sprite
+    sprite: Objects/Specific/Medical/medical.rsi
+    layers:
+    - state: bloodpack-liquid-1
+      map: [ "enum.SolutionContainerLayers.Fill" ]
+      visible: false
+    - state: bloodpack-empty
+      map: [ "enum.SolutionContainerLayers.Base" ]
+  - type: Icon
+    sprite: Objects/Specific/Medical/medical.rsi
+    state: bloodpack-empty
+  - type: Item
+    heldPrefix: bloodpack
+    size: Small
+    sprite: Objects/Specific/Medical/medical.rsi
+  - type: InjectableSolution
+    solution: ivbag
+  - type: DrawableSolution
+    solution: ivbag
+  - type: SolutionContainerVisuals
+    maxFillLevels: 5
+    fillBaseName: bloodpack-liquid-
+    inHandsMaxFillLevels: 0
+    solutionName: ivbag
+  - type: Construction
+    graph: IVBags
+    node: empty

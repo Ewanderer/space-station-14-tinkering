@@ -522,6 +522,9 @@
   id: EmitterBolt # Default value in ContainmentFieldGeneratorComponent for tagged collisions that power the generator.
 
 - type: Tag
+  id: EmptyIVBag # crafting
+
+- type: Tag
   id: EncryptionCargo # ItemMapper: TelecomServer
 
 - type: Tag
@@ -827,6 +830,9 @@
 
 - type: Tag
   id: InvalidForSurvivorAntag # Used by server MagicSystem and SurvivorRuleSystem to alter mind roles from global spawn spells.
+
+- type: Tag
+  id: IVBag # for white listing.
 
 ## J ##
 
