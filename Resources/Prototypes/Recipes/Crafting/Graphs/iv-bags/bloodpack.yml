@@ -20,8 +20,13 @@
       - !type:MinSolution
         solution: ivbag
         reagent:
-          ReagentId: WeldingFuel
-        quantity: 40
+          ReagentId: JuiceTomato
+        quantity: 15
+      - !type:MinSolution
+        solution: ivbag
+        reagent:
+          ReagentId: Saline
+        quantity: 45
       steps:
       - material: Steel
         amount: 1
