@@ -12,6 +12,9 @@
           sprite: Objects/Specific/Medical/medical.rsi
           state: bloodpack-empty
         doAfter: 0.1
+      completed:
+      - !type:PopupUser
+        text: You drained the bags.
   - node: empty
     entity: EmptyIVBagPack
     edges:
