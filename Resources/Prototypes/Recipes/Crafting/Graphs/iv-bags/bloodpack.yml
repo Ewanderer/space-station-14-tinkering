@@ -3,19 +3,6 @@
   start: start
   graph:
   - node: start
-    edges:
-    - to: empty
-      steps:
-      - tag: EmptyIVBag
-        name: empty iv bag pack
-        icon:
-          sprite: Objects/Specific/Medical/medical.rsi
-          state: bloodpack-empty
-        doAfter: 0.1
-      completed:
-      - !type:PopupUser
-        text: You drained the bags.
-  - node: empty
     entity: EmptyIVBagPack
     edges:
     - to: done
@@ -31,8 +18,7 @@
           ReagentId: Saline
         quantity: 45
       steps:
-      - material: Steel
-        amount: 1
-        doAfter: 0.1
+        - mix:
+          solutionName: "ivbag"
   - node: done
     entity: Bloodpack

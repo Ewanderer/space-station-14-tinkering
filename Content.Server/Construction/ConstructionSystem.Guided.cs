@@ -1,10 +1,16 @@
+using System.Linq;
 using Content.Server.Construction.Components;
+using Content.Server.Construction.Conditions;
 using Content.Shared.Construction;
+using Content.Shared.Construction.Conditions;
+using Content.Shared.Construction.NodeEntities;
 using Content.Shared.Construction.Prototypes;
 using Content.Shared.Construction.Steps;
+using Content.Shared.EntityConditions.Conditions;
 using Content.Shared.Examine;
 using Content.Shared.Popups;
 using Content.Shared.Verbs;
+using Robust.Shared.Prototypes;
 using Robust.Shared.Utility;
 
 namespace Content.Server.Construction
@@ -94,7 +100,7 @@ namespace Content.Server.Construction
                             && ProtoMan.TryIndex(targetProtoId, out var targetPrototype))
                         {
                             args.PushMarkup(Loc.GetString("construction-component-to-create-prototype-header",
-                            ("targetName", targetPrototype.Name)) + "\n");
+                                ("targetName", targetPrototype.Name)) + "\n");
                         }
                         else
                         {
@@ -130,7 +136,6 @@ namespace Content.Server.Construction
                         edge.Steps[component.StepIndex].DoExamine(args);
                 }
             }
-
         }
 
 
@@ -174,7 +179,8 @@ namespace Content.Server.Construction
                 new()
                 {
                     Localization = construction.Type == ConstructionType.Structure
-                        ? "construction-presenter-to-build" : "construction-presenter-to-craft",
+                        ? "construction-presenter-to-build"
+                        : "construction-presenter-to-craft",
                     EntryNumber = step,
                 }
             };
@@ -184,8 +190,11 @@ namespace Content.Server.Construction
             // Iterate until the penultimate node.
             var node = startNode;
             var index = 0;
-            while(node != targetNode)
+
+            while (node != targetNode)
             {
+                var takenConditions = new List<IGraphCondition>();
+
                 // Can't find path, therefore can't generate guide...
                 if (!node.TryGetEdge(path[index].Name, out var edge))
                     return null;
@@ -193,13 +202,43 @@ namespace Content.Server.Construction
                 // First steps are handled specially.
                 if (step == 1)
                 {
+                    if (node.Entity != new NullNodeEntity())
+                    {
+                        var prototypeId = node.Entity.GetId(null, null, new());
+                        if (prototypeId != null && ProtoMan.Resolve(new EntProtoId(prototypeId), out var prototype))
+                        {
+                            prototype.Components.TryGetComponent("Icon", out var icon);
+                            var iconValue = icon?.GetType().GetField("Icon")?.GetValue(icon) as SpriteSpecifier.Rsi;
+
+                            entries.Add(new()
+                            {
+                                Arguments = [("name", prototype.Name)],
+                                Localization = "construction-presenter-to-start-take",
+                                Icon = iconValue
+                            });
+                        }
+                    }
+
+
+                    if (edge.Steps.FirstOrDefault() is MixConstructionGraphStep)
+                    {
+                        foreach (var condition in edge.Conditions.Where(e => e is MinSolution))
+                        {
+                            takenConditions.Add(condition);
+                            entries.AddRange(condition.GenerateGuideEntry());
+                        }
+                    }
+
+
                     foreach (var graphStep in edge.Steps)
                     {
                         // This graph is invalid, we only allow insert steps as the initial construction steps.
-                        if (graphStep is not EntityInsertConstructionGraphStep insertStep)
+                        if (graphStep is EntityInsertConstructionGraphStep insertStep)
+                            entries.Add(insertStep.GenerateGuideEntry());
+                        else if (graphStep is MixConstructionGraphStep mixStep)
+                            entries.Add(mixStep.GenerateGuideEntry());
+                        else
                             return null;
-
-                        entries.Add(insertStep.GenerateGuideEntry());
                     }
 
                     // Now actually list the construction conditions.
@@ -227,6 +266,8 @@ namespace Content.Server.Construction
 
                 foreach (var condition in edge.Conditions)
                 {
+                    if (takenConditions.Contains(condition))
+                        continue;
                     foreach (var conditionEntry in condition.GenerateGuideEntry())
                     {
                         conditions.Add(conditionEntry.Localization);

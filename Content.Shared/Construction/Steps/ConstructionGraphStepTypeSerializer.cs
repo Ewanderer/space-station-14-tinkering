@@ -46,6 +46,9 @@ namespace Content.Shared.Construction.Steps
                 return typeof(PartAssemblyConstructionGraphStep);
             }
 
+            if (node.Has("mix"))
+                return typeof(MixConstructionGraphStep);
+
             // See Read below if you are adding new types
             return null;
         }
@@ -81,6 +84,9 @@ namespace Content.Shared.Construction.Steps
 
             if (type == typeof(PartAssemblyConstructionGraphStep))
                 return serializationManager.Read<PartAssemblyConstructionGraphStep>(node, hookCtx, context, notNullableOverride: true);
+
+            if (type == typeof(MixConstructionGraphStep))
+                return serializationManager.Read<MixConstructionGraphStep>(node, hookCtx, context, notNullableOverride: true);
 
             // See GetType above if you are adding new types
             throw new NotImplementedException();

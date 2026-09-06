@@ -2,6 +2,8 @@ using System.Linq;
 using Content.Server.Administration.Logs;
 using Content.Server.Construction.Components;
 using Content.Server.Temperature.Components;
+using Content.Shared.APC;
+using Content.Shared.Chemistry.EntitySystems;
 using Content.Shared.Construction;
 using Content.Shared.Construction.Components;
 using Content.Shared.Construction.EntitySystems;
@@ -44,6 +46,7 @@ namespace Content.Server.Construction
                 new []{typeof(EncryptionKeySystem)});
             SubscribeLocalEvent<ConstructionComponent, TemperatureChangedEvent>(EnqueueRefEvent);
             SubscribeLocalEvent<ConstructionComponent, PartAssemblyPartInsertedEvent>(EnqueueEvent);
+            SubscribeLocalEvent<ConstructionComponent, SolutionChangedEvent>(EnqueueRefEvent);
         }
 
         /// <summary>
@@ -422,6 +425,15 @@ namespace Content.Server.Construction
                         break;
 
                     if (partAssemblyStep.Condition(uid, EntityManager))
+                        return validation ? HandleResult.Validated : HandleResult.True;
+                    return HandleResult.False;
+                }
+                case MixConstructionGraphStep mixConstructionGraphStep:
+                {
+                    if (ev is not SolutionChangedEvent)
+                        break;
+
+                    if(mixConstructionGraphStep.EntityValid(uid,EntityManager,Factory))
                         return validation ? HandleResult.Validated : HandleResult.True;
                     return HandleResult.False;
                 }

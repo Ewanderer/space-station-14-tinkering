@@ -36,4 +36,4 @@
     solutionName: ivbag
   - type: Construction
     graph: IVBags
-    node: empty
+    node: start

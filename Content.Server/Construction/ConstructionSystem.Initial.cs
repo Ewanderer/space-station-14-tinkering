@@ -511,6 +511,10 @@ namespace Content.Server.Construction
                         if (entityInsert.EntityValid(holding, EntityManager, Factory))
                             valid = true;
                         break;
+                    case MixConstructionGraphStep mixSolution:
+                        if (mixSolution.EntityValid(holding, EntityManager, Factory))
+                            valid = true;
+                        break;
                     case ToolConstructionGraphStep _:
                         throw new InvalidDataException("Invalid first step for item recipe!");
                 }
