@@ -8,7 +8,7 @@ namespace Content.Shared.EntityConditions.Conditions.Generic;
 /// </summary>
 public sealed partial class IsGhostConditionSystem : EntityConditionSystem<TransformComponent, IsGhostCondition>
 {
-    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<IsGhostCondition> args)
+    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<IsGhostCondition,EntityUid> args)
     {
         args.Result = HasComp<GhostComponent>(entity);
     }

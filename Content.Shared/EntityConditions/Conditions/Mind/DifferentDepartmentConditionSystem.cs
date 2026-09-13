@@ -12,9 +12,9 @@ public sealed partial class DifferentDepartmentConditionSystem : EntityCondition
     [Dependency] private SharedRoleSystem _roleSystem = default!;
     [Dependency] private SharedJobSystem _jobSystem = default!;
 
-    protected override void Condition(Entity<MindComponent> entity, ref EntityConditionEvent<DifferentDepartmentCondition> args)
+    protected override void Condition(Entity<MindComponent> entity, ref EntityConditionEvent<DifferentDepartmentCondition,EntityUid> args)
     {
-        args.Result = !IsInvalid(entity, args.SourceEnt);
+        args.Result = !IsInvalid(entity, args.SourceObject);
     }
 
     private bool IsInvalid(Entity<MindComponent> mind, EntityUid? exclude)

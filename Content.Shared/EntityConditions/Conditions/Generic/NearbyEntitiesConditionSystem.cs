@@ -12,7 +12,7 @@ public sealed partial class NearbyEntitiesConditionSystem : EntityConditionSyste
     [Dependency] private EntityLookupSystem _lookup = default!;
     [Dependency] private EntityWhitelistSystem _whitelist = default!;
 
-    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<NearbyEntitiesCondition> args)
+    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<NearbyEntitiesCondition,EntityUid> args)
     {
         if (entity.Comp.MapUid == null)
         {

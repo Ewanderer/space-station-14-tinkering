@@ -13,7 +13,7 @@ public sealed partial class NearbyAccessConditionSystem : EntityConditionSystem<
     [Dependency] private EntityLookupSystem _lookup = default!;
     [Dependency] private AccessReaderSystem _reader = default!;
 
-    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<NearbyAccessCondition> args)
+    protected override void Condition(Entity<TransformComponent> entity, ref EntityConditionEvent<NearbyAccessCondition,EntityUid> args)
     {
         if (entity.Comp.MapUid == null)
         {

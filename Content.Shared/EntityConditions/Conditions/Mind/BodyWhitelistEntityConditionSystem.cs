@@ -8,7 +8,7 @@ public sealed partial class BodyWhitelistEntityConditionSystem : EntityCondition
 {
     [Dependency] private EntityWhitelistSystem _whitelist = default!;
 
-    protected override void Condition(Entity<MindComponent> entity, ref EntityConditionEvent<BodyWhitelistCondition> args)
+    protected override void Condition(Entity<MindComponent> entity, ref EntityConditionEvent<BodyWhitelistCondition,EntityUid> args)
     {
         if (entity.Comp.OwnedEntity is not { } body)
             return;

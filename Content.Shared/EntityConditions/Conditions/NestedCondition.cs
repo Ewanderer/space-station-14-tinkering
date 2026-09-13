@@ -24,7 +24,7 @@ public sealed partial class NestedConditionSystem : EntityConditionSystem<Transf
 {
     [Dependency] private SharedEntityConditionsSystem _conditions = default!;
 
-    protected override void Condition(Entity<TransformComponent> ent, ref EntityConditionEvent<NestedCondition> args)
+    protected override void Condition(Entity<TransformComponent> ent, ref EntityConditionEvent<NestedCondition,EntityUid> args)
     {
         args.Result = _conditions.TryCondition(ent, args.Condition.Proto);
     }

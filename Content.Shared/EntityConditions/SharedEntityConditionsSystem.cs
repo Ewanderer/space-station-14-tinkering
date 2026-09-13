@@ -1,3 +1,4 @@
+using Content.Shared.Chemistry.Components;
 using Robust.Shared.Prototypes;
 
 namespace Content.Shared.EntityConditions;
@@ -17,7 +18,8 @@ public sealed partial class SharedEntityConditionsSystem : EntitySystem, IEntity
     /// <param name="sourceEnt">An optional "source entity" which is checking the condition on the entity this is being raised to.
     /// Sometimes needed for additional context with conditions.</param>
     /// <returns>Returns true if all conditions return true, false if any fail</returns>
-    public bool TryConditions<T>(EntityUid target, T[]? conditions, EntityUid? sourceEnt = null) where T : EntityCondition
+    public bool TryConditions<T>(EntityUid target, T[]? conditions, EntityUid? sourceEnt = null)
+        where T : EntityCondition
     {
         // If there's no conditions we can't fail any of them...
         if (conditions == null)
@@ -40,7 +42,8 @@ public sealed partial class SharedEntityConditionsSystem : EntitySystem, IEntity
     /// <param name="sourceEnt">An optional "source entity" which is checking the condition on the entity this is being raised to.
     /// Sometimes needed for additional context with conditions.</param>
     /// <returns>Returns true if any conditions return true</returns>
-    public bool TryAnyCondition<T>(EntityUid target, T[]? conditions, EntityUid? sourceEnt = null) where T : EntityCondition
+    public bool TryAnyCondition<T>(EntityUid target, T[]? conditions, EntityUid? sourceEnt = null)
+        where T : EntityCondition
     {
         // If there's no conditions we can't meet any of them...
         if (conditions == null)
@@ -71,9 +74,22 @@ public sealed partial class SharedEntityConditionsSystem : EntitySystem, IEntity
     /// <summary>
     /// Raises a condition to an entity. You should not be calling this unless you know what you're doing.
     /// </summary>
-    public bool RaiseConditionEvent<T>(EntityUid target, T effect, EntityUid? sourceEnt) where T : EntityConditionBase<T>
+    public bool RaiseConditionEvent<TCondition, TSource>(EntityUid target, TCondition condition, TSource? sourceObj)
+        where TCondition : EntityConditionBase<TCondition>
     {
-        var effectEv = new EntityConditionEvent<T>(effect, sourceEnt);
+        var effectEv = new EntityConditionEvent<TCondition, TSource>(condition, sourceObj);
+        RaiseLocalEvent(target, ref effectEv);
+        return effectEv.Result;
+    }
+
+    /// <summary>
+    /// Raises a condition to an entity. You should not be calling this unless you know what you're doing.
+    /// </summary>
+    public float? RaiseConditionScaleEvent<TCondition, TSource>(EntityUid target,
+        TCondition condition,
+        TSource? sourceObj) where TCondition : EntityConditionBase<TCondition>
+    {
+        var effectEv = new EntityConditionScaleEvent<TCondition, TSource>(condition, sourceObj);
         RaiseLocalEvent(target, ref effectEv);
         return effectEv.Result;
     }
@@ -84,14 +100,16 @@ public sealed partial class SharedEntityConditionsSystem : EntitySystem, IEntity
 /// </summary>
 /// <typeparam name="T">The Component that is required for the effect</typeparam>
 /// <typeparam name="TCon">The Condition we're testing</typeparam>
-public abstract partial class EntityConditionSystem<T, TCon> : EntitySystem where T : Component where TCon : EntityConditionBase<TCon>
+public abstract partial class EntityConditionSystem<T, TCon> : EntitySystem
+    where T : Component where TCon : EntityConditionBase<TCon>
 {
     /// <inheritdoc/>
     public override void Initialize()
     {
-        SubscribeLocalEvent<T, EntityConditionEvent<TCon>>(Condition);
+        SubscribeLocalEvent<T, EntityConditionEvent<TCon, EntityUid>>(Condition);
     }
-    protected abstract void Condition(Entity<T> entity, ref EntityConditionEvent<TCon> args);
+
+    protected abstract void Condition(Entity<T> entity, ref EntityConditionEvent<TCon, EntityUid> args);
 }
 
 /// <summary>
@@ -99,7 +117,20 @@ public abstract partial class EntityConditionSystem<T, TCon> : EntitySystem wher
 /// </summary>
 public interface IEntityConditionRaiser
 {
-    bool RaiseConditionEvent<T>(EntityUid target, T effect, EntityUid? sourceEnt) where T : EntityConditionBase<T>;
+    /// <summary>
+    /// Fire a <see cref="EntityConditionEvent{TCondition,TSource}"/> on target, using condition and source object as parameter.
+    /// </summary>
+    /// <param name="target">Where the event will be raised</param>
+    /// <param name="condition">The condition to be evaluated</param>
+    /// <param name="sourceObject">The optional source object</param>
+    /// <typeparam name="TCondition">Type of the condition</typeparam>
+    /// <typeparam name="TSource">Type of the source. Expect <see cref="EntityUid"/> or <see cref="Solution"/>> but could be any other DataDefinition, if necessary in the future.</typeparam>
+    /// <returns></returns>
+    bool RaiseConditionEvent<TCondition, TSource>(EntityUid target, TCondition condition, TSource? sourceObject)
+        where TCondition : EntityConditionBase<TCondition>;
+
+    float? RaiseConditionScaleEvent<TCondition, TSource>(EntityUid target, TCondition condition, TSource? sourceObject)
+        where TCondition : EntityConditionBase<TCondition>;
 }
 
 /// <summary>
@@ -108,13 +139,24 @@ public interface IEntityConditionRaiser
 /// <typeparam name="T">The Condition wer are raising.</typeparam>
 public abstract partial class EntityConditionBase<T> : EntityCondition where T : EntityConditionBase<T>
 {
-    public override bool RaiseEvent(EntityUid target, IEntityConditionRaiser raiser, EntityUid? sourceEnt)
+    public override bool RaiseEvent<TSource>(EntityUid target, IEntityConditionRaiser raiser, TSource? sourceObj)
+        where TSource : default
     {
         if (this is not T type)
             return false;
 
         // If the result of the event matches the result we're looking for then we pass.
-        return raiser.RaiseConditionEvent(target, type, sourceEnt);
+        return raiser.RaiseConditionEvent<T, TSource>(target, type, sourceObj);
+    }
+
+    public override float RaiseScaleEvent<TSource>(EntityUid target, IEntityConditionRaiser raiser, TSource? sourceObj)
+        where TSource : default
+    {
+        if (this is not T type)
+            return ValueIfScaleNull;
+
+        // If the result of the event matches the result we're looking for then we pass.
+        return raiser.RaiseConditionScaleEvent<T, TSource>(target, type, sourceObj) ?? ValueIfScaleNull;
     }
 }
 
@@ -127,13 +169,25 @@ public abstract partial class EntityCondition
     /// <summary>
     /// Check this condition on a target.
     /// </summary>
-    public abstract bool RaiseEvent(EntityUid target, IEntityConditionRaiser raiser, EntityUid? sourceEnt);
+    public abstract bool RaiseEvent<TSource>(EntityUid target, IEntityConditionRaiser raiser, TSource? sourceObj);
+
+    /// <summary>
+    /// Check this condition on a target.
+    /// </summary>
+    public abstract float RaiseScaleEvent<TSource>(EntityUid target, IEntityConditionRaiser raiser, TSource? sourceObj);
 
     /// <summary>
     /// If true, invert the result. So false returns true and true returns false!
     /// </summary>
     [DataField]
     public bool Inverted;
+
+    /// <summary>
+    /// The Value if <see cref="RaiseScaleEvent{TSource}"/> returns null.
+    /// Thus depending on the context/use of the condition, failure to evaluate this condition can be treated as 0, 1, etc.
+    /// </summary>
+    [DataField]
+    public float ValueIfScaleNull;
 
     /// <summary>
     /// A basic description of this condition, which displays in the guidebook.
@@ -147,7 +201,8 @@ public abstract partial class EntityCondition
 /// <param name="Condition">The Condition we're checking</param>
 [ByRefEvent]
 [DataRecord]
-public partial record struct EntityConditionEvent<T>(T Condition, EntityUid? SourceEnt) where T : EntityConditionBase<T>
+public partial record struct EntityConditionEvent<TCondition, TSource>(TCondition Condition, TSource? SourceObject)
+    where TCondition : EntityConditionBase<TCondition>
 {
     /// <summary>
     /// The result of our check, defaults to false if nothing handles it.
@@ -158,11 +213,41 @@ public partial record struct EntityConditionEvent<T>(T Condition, EntityUid? Sou
     /// <summary>
     /// The Condition being raised in this event
     /// </summary>
-    public readonly T Condition = Condition;
+    public readonly TCondition Condition = Condition;
 
     /// <summary>
-    /// An optional "source entity" which is checking the condition on the entity this is being raised to.
+    /// An optional "source object" which is checking the condition on the entity this is being raised to.
     /// Sometimes needed for additional context with conditions.
+    /// This can be an EntityUID, a solution or any other item.
     /// </summary>
-    public readonly EntityUid? SourceEnt = SourceEnt;
+    public readonly TSource? SourceObject = SourceObject;
+}
+
+/// <summary>
+/// An Event carrying an entity effect.
+/// </summary>
+/// <param name="Condition">The Condition we're checking</param>
+[ByRefEvent]
+[DataRecord]
+public partial record struct EntityConditionScaleEvent<TCondition, TSource>(TCondition Condition, TSource? SourceObject)
+    where TCondition : EntityConditionBase<TCondition>
+{
+    /// <summary>
+    /// The result of the check, null if was not evaluated.
+    /// This is treated as either a 0 in additive context and 1 or 0 in a multiplicative context.
+    /// </summary>
+    [DataField]
+    public float? Result = null;
+
+    /// <summary>
+    /// The Condition being raised in this event
+    /// </summary>
+    public readonly TCondition Condition = Condition;
+
+    /// <summary>
+    /// An optional "source object" which is checking the condition on the entity this is being raised to.
+    /// Sometimes needed for additional context with conditions.
+    /// This can be an EntityUID, a solution or any other item.
+    /// </summary>
+    public readonly TSource? SourceObject = SourceObject;
 }

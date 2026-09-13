@@ -11,12 +11,53 @@ namespace Content.Shared.EntityConditions.Conditions;
 /// <inheritdoc cref="EntityConditionSystem{T, TCondition}"/>
 public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem<SolutionComponent, ReagentCondition>
 {
-    protected override void Condition(Entity<SolutionComponent> entity, ref EntityConditionEvent<ReagentCondition> args)
+    public override void Initialize()
+    {
+        base.Initialize();
+        SubscribeLocalEvent<SolutionComponent, EntityConditionEvent<ReagentCondition, Solution>>(ConditionOnSolution);
+        SubscribeLocalEvent<SolutionComponent, EntityConditionScaleEvent<ReagentCondition, Solution>>(
+            ConditionScaleOnSolution);
+        SubscribeLocalEvent<SolutionComponent, EntityConditionScaleEvent<ReagentCondition, EntityUid>>(
+            ConditionScale);
+    }
+
+    private void ConditionScale(Entity<SolutionComponent> ent, ref EntityConditionScaleEvent<ReagentCondition, EntityUid> args)
+    {
+        args.Result = EvaluateScale(args.Condition, ent.Comp.Solution);
+    }
+
+    private void ConditionScaleOnSolution(Entity<SolutionComponent> ent,
+        ref EntityConditionScaleEvent<ReagentCondition, Solution> args)
+    {
+        if (args.SourceObject == null)
+            return;
+        args.Result = EvaluateScale(args.Condition, args.SourceObject);
+    }
+
+    private static float EvaluateScale(ReagentCondition condition, Solution solution)
+    {
+        return ((solution.Temperature - condition.Min) / (condition.Max - condition.Min)).Float();
+    }
+
+    private void ConditionOnSolution(Entity<SolutionComponent> ent,
+        ref EntityConditionEvent<ReagentCondition, Solution> args)
+    {
+        if (args.SourceObject == null)
+            return;
+        args.Result = CheckOnCondition(args.Condition, args.SourceObject);
+    }
+
+    protected override void Condition(Entity<SolutionComponent> entity,
+        ref EntityConditionEvent<ReagentCondition, EntityUid> args)
     {
         var soln = entity.Comp.Solution;
-        var quant = soln.GetTotalPrototypeQuantity(args.Condition.Reagent);
+        args.Result = CheckOnCondition(args.Condition, soln);
+    }
 
-        args.Result = quant >= args.Condition.Min && quant <= args.Condition.Max;
+    private static bool CheckOnCondition(ReagentCondition condition, Solution soln)
+    {
+        var quant = soln.GetTotalPrototypeQuantity(condition.Reagent);
+        return quant >= condition.Min && quant <= condition.Max;
     }
 }
 
