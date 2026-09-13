@@ -9,7 +9,7 @@ namespace Content.Shared.EntityConditions.Conditions;
 /// Returns true if this solution entity has an amount of reagent in it within a specified minimum and maximum.
 /// </summary>
 /// <inheritdoc cref="EntityConditionSystem{T, TCondition}"/>
-public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem<SolutionComponent, ReagentCondition>
+public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem<SolutionComponent, ReagentCondition>, IArbitaryConditionEvaluator<Solution, ReagentCondition>
 {
     public override void Initialize()
     {
@@ -23,7 +23,7 @@ public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem
 
     private void ConditionScale(Entity<SolutionComponent> ent, ref EntityConditionScaleEvent<ReagentCondition, EntityUid> args)
     {
-        args.Result = EvaluateScale(args.Condition, ent.Comp.Solution);
+        args.Result = Scale(ent.Comp.Solution, args.Condition);
     }
 
     private void ConditionScaleOnSolution(Entity<SolutionComponent> ent,
@@ -31,12 +31,7 @@ public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem
     {
         if (args.SourceObject == null)
             return;
-        args.Result = EvaluateScale(args.Condition, args.SourceObject);
-    }
-
-    private static float EvaluateScale(ReagentCondition condition, Solution solution)
-    {
-        return ((solution.Temperature - condition.Min) / (condition.Max - condition.Min)).Float();
+        args.Result = Scale(args.SourceObject, args.Condition);
     }
 
     private void ConditionOnSolution(Entity<SolutionComponent> ent,
@@ -44,25 +39,30 @@ public sealed partial class ReagentEntityConditionSystem : EntityConditionSystem
     {
         if (args.SourceObject == null)
             return;
-        args.Result = CheckOnCondition(args.Condition, args.SourceObject);
+        args.Result = DoesSatisfy(args.SourceObject, args.Condition);
     }
 
     protected override void Condition(Entity<SolutionComponent> entity,
         ref EntityConditionEvent<ReagentCondition, EntityUid> args)
     {
         var soln = entity.Comp.Solution;
-        args.Result = CheckOnCondition(args.Condition, soln);
+        args.Result = DoesSatisfy(soln,args.Condition);
     }
 
-    private static bool CheckOnCondition(ReagentCondition condition, Solution soln)
+    public static bool DoesSatisfy(Solution soln, ReagentCondition condition)
     {
         var quant = soln.GetTotalPrototypeQuantity(condition.Reagent);
         return quant >= condition.Min && quant <= condition.Max;
     }
+
+    public static float? Scale(Solution solution, ReagentCondition condition)
+    {
+        return ((solution.Temperature - condition.Min) / (condition.Max - condition.Min)).Float();
+    }
 }
 
 /// <inheritdoc cref="EntityCondition"/>
-public sealed partial class ReagentCondition : EntityConditionBase<ReagentCondition>
+public sealed partial class ReagentCondition : EntityConditionBaseWithArbitrageBase<ReagentCondition,Solution, ReagentEntityConditionSystem>
 {
     [DataField]
     public FixedPoint2 Min = FixedPoint2.Zero;

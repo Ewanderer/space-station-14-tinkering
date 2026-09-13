@@ -34,6 +34,22 @@ public sealed partial class SharedEntityConditionsSystem : EntitySystem, IEntity
         return true;
     }
 
+    public bool TryCondition<TCondition, TData>(TData target, TCondition condition)
+        where TCondition: EntityConditionBase<TCondition>
+    {
+        if (condition is not EntityConditionBaseWithArbitrage<TCondition, TData> validCondition)
+            return false;
+        return condition.Inverted !=validCondition.DoesSatisfy(target);
+    }
+
+    public float TryConditionScale<TCondition, TData>(TData target, TCondition condition)
+        where TCondition: EntityConditionBase<TCondition>
+    {
+        if (condition is not EntityConditionBaseWithArbitrage<TCondition, TData> validCondition)
+            return condition.ValueIfScaleNull;
+        return validCondition.GetScale(target);
+    }
+
     /// <summary>
     /// Checks a list of conditions to see if any are true.
     /// </summary>
@@ -112,6 +128,13 @@ public abstract partial class EntityConditionSystem<T, TCon> : EntitySystem
     protected abstract void Condition(Entity<T> entity, ref EntityConditionEvent<TCon, EntityUid> args);
 }
 
+public interface IArbitaryConditionEvaluator<TData, TCondition> where TCondition : EntityCondition
+{
+    abstract static bool DoesSatisfy(TData target, TCondition condition);
+
+    abstract static float? Scale(TData target, TCondition condition);
+}
+
 /// <summary>
 /// Used to raise an EntityCondition without losing the type of condition.
 /// </summary>
@@ -157,6 +180,43 @@ public abstract partial class EntityConditionBase<T> : EntityCondition where T :
 
         // If the result of the event matches the result we're looking for then we pass.
         return raiser.RaiseConditionScaleEvent<T, TSource>(target, type, sourceObj) ?? ValueIfScaleNull;
+    }
+}
+
+/// <summary>
+/// For conditions which could be evaluated on a single data structure, like solution. We can hard-wire the evaluation into it.
+/// </summary>
+/// <typeparam name="TCondition">The Condition wer are raising.</typeparam>
+/// <typeparam name="TData">The data structure this condition satisfies</typeparam>
+public abstract partial class
+    EntityConditionBaseWithArbitrage<TCondition, TData> : EntityConditionBase<TCondition>
+    where TCondition : EntityConditionBase<TCondition>
+{
+    public abstract bool DoesSatisfy(TData target);
+
+    public abstract float GetScale(TData target);
+}
+
+/// <summary>
+/// For conditions which could be evaluated on a single data structure, like solution. We can hard-wire the evaluation into it.
+/// </summary>
+/// <typeparam name="TCondition">The Condition wer are raising.</typeparam>
+/// <typeparam name="TData">The data structure this condition satisfies</typeparam>
+/// <typeparam name="TEvaluator">The evaluator this condition is tied to.</typeparam>
+public abstract partial class
+    EntityConditionBaseWithArbitrageBase<TCondition, TData, TEvaluator> : EntityConditionBaseWithArbitrage<TCondition,TData>
+    where TCondition : EntityConditionBase<TCondition> where TEvaluator : IArbitaryConditionEvaluator<TData, TCondition>
+{
+    public override bool DoesSatisfy(TData target)
+    {
+        return this is TCondition condition && TEvaluator.DoesSatisfy(target, condition);
+    }
+
+    public override float GetScale(TData target)
+    {
+        if (this is not TCondition condition)
+            return ValueIfScaleNull;
+        return TEvaluator.Scale(target, condition) ?? ValueIfScaleNull;
     }
 }
 
